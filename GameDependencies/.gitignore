@@ -1,0 +1,7 @@
+# Ignore everything
+*
+*/
+
+# ... keep this stuff though
+!.gitignore
+!README.md

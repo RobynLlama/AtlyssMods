@@ -1,0 +1,8 @@
+# Ignore everything
+*
+*/
+
+# ... keep this stuff though
+!.gitignore
+!genhooks.sh
+!README.md

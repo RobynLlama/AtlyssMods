@@ -1,0 +1,108 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.1</TargetFramework>
+        <LangVersion>11</LangVersion>
+        <Nullable>disable</Nullable>
+    </PropertyGroup>
+    
+    <PropertyGroup>
+        <ModDependenciesPath>..\..\GameDependencies\</ModDependenciesPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Atlyss assembly and hooks -->
+        <Reference Include="Assembly-CSharp">
+            <HintPath>$(ModDependenciesPath)Assembly-CSharp.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="MMHOOK_Assembly-CSharp">
+            <HintPath>$(ModDependenciesPath)MMHOOK_Assembly-CSharp.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="PUBLIC-Assembly-CSharp">
+            <HintPath>$(ModDependenciesPath)PUBLIC-Assembly-CSharp.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        
+        <!-- Other dependencies -->
+        <Reference Include="com.rlabrecque.steamworks.net">
+            <HintPath>$(ModDependenciesPath)com.rlabrecque.steamworks.net.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        
+        <!-- BepInEx -->
+        <Reference Include="BepInEx">
+            <HintPath>$(ModDependenciesPath)BepInEx.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="BepInEx.Harmony">
+            <HintPath>$(ModDependenciesPath)BepInEx.Harmony.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="BepInEx.Preloader">
+            <HintPath>$(ModDependenciesPath)BepInEx.Preloader.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        
+        <!-- Harmony -->
+        <Reference Include="0Harmony">
+            <HintPath>$(ModDependenciesPath)0Harmony.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="0Harmony20">
+            <HintPath>$(ModDependenciesPath)0Harmony20.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="HarmonyXInterop">
+            <HintPath>$(ModDependenciesPath)HarmonyXInterop.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        
+        <!-- Mono -->
+        <Reference Include="Mono.Cecil">
+            <HintPath>$(ModDependenciesPath)Mono.Cecil.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="Mono.Cecil.Mdb">
+            <HintPath>$(ModDependenciesPath)Mono.Cecil.Mdb.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="Mono.Cecil.Pdb">
+            <HintPath>$(ModDependenciesPath)Mono.Cecil.Pdb.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="Mono.Cecil.Rocks">
+            <HintPath>$(ModDependenciesPath)Mono.Cecil.Rocks.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        
+        <!-- MonoMod -->
+        <Reference Include="MonoMod">
+            <HintPath>$(ModDependenciesPath)MonoMod.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="MonoMod.RuntimeDetour">
+            <HintPath>$(ModDependenciesPath)MonoMod.RuntimeDetour.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="MonoMod.Utils">
+            <HintPath>$(ModDependenciesPath)MonoMod.Utils.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+
+        <!-- Unity -->
+        <Reference Include="UnityEngine">
+            <HintPath>$(ModDependenciesPath)UnityEngine.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="UnityEngine.CoreModule">
+            <HintPath>$(ModDependenciesPath)UnityEngine.CoreModule.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="UnityEngine.UI">
+            <HintPath>$(ModDependenciesPath)UnityEngine.UI.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+    </ItemGroup>
+</Project>

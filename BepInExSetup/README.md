@@ -1,0 +1,1 @@
+Workspace for generating a BepInEx pack with assembly publicizer and hookgen stuff
