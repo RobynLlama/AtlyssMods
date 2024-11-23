@@ -34,6 +34,10 @@
             <HintPath>$(ModDependenciesPath)com.rlabrecque.steamworks.net.dll</HintPath>
             <Private>False</Private>
         </Reference>
+        <Reference Include="Mirror">
+            <HintPath>$(ModDependenciesPath)Mirror.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
         
         <!-- BepInEx -->
         <Reference Include="BepInEx">
@@ -98,6 +102,10 @@
         <!-- Unity -->
         <Reference Include="UnityEngine">
             <HintPath>$(ModDependenciesPath)UnityEngine.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="UnityEngine.AudioModule">
+            <HintPath>$(ModDependenciesPath)UnityEngine.AudioModule.dll</HintPath>
             <Private>False</Private>
         </Reference>
         <Reference Include="UnityEngine.CoreModule">
