@@ -12,10 +12,10 @@ using BepInEx.Logging;
 [module: UnverifiableCode]
 [assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification = true)]
 
-namespace AtlyssDiscordRPC;
+namespace Marioalexsan.AtlyssDiscordRichPresence;
 
 [BepInPlugin("Marioalexsan.AtlyssDiscordRPC", "Discord Rich Presence for Atlyss", "1.0.0")]
-public class AtlyssDiscordRPC : BaseUnityPlugin
+public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
 {
     private enum PresenceState
     {

@@ -10,10 +10,10 @@ using UnityEngine;
 [module: UnverifiableCode]
 [assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification = true)]
 
-namespace TemplateMod;
+namespace Marioalexsan.NoPlayerCap;
 
 [BepInPlugin("Marioalexsan.NoPlayerCap", "Raises server max player cap to 64", "1.0.0")]
-public class TemplateMod : BaseUnityPlugin
+public class NoPlayerCapMod : BaseUnityPlugin
 {
     private void Awake()
     {
