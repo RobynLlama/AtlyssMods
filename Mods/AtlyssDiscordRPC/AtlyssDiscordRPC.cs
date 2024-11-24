@@ -205,13 +205,13 @@ public class AtlyssDiscordRPC : BaseUnityPlugin
         var level = _lastLevel = player?._statusEntity._pStats._currentLevel ?? _lastLevel;
 
         var health = _lastHealth = player?._statusEntity._currentHealth ?? _lastHealth;
-        var maxHealth = _lastMaxHealth = player?._statusEntity._pStats._newStatStruct._maxHealth ?? _lastMaxHealth;
+        var maxHealth = _lastMaxHealth = player?._statusEntity._pStats.Network_statStruct._maxHealth ?? _lastMaxHealth;
 
         var mana = _lastMana = player?._statusEntity._currentMana ?? _lastMana;
-        var maxMana = _lastMaxMana = player?._statusEntity._pStats._newStatStruct._maxMana ?? _lastMaxMana;
+        var maxMana = _lastMaxMana = player?._statusEntity._pStats.Network_statStruct._maxMana ?? _lastMaxMana;
 
         var stamina = _lastStamina = player?._statusEntity._currentStamina ?? _lastStamina;
-        var maxStamina = _lastMaxStamina = player?._statusEntity._pStats._newStatStruct._maxStamina ?? _lastMaxStamina;
+        var maxStamina = _lastMaxStamina = player?._statusEntity._pStats.Network_statStruct._maxStamina ?? _lastMaxStamina;
 
         var combatState = _lastCombatState;
         var combatIsBoss = _lastCombatStateIsBoss;
