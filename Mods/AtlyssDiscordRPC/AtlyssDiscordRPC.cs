@@ -33,12 +33,35 @@ public class AtlyssDiscordRPC : BaseUnityPlugin
     private static int discordPipe = -1;
 
     private DateTime _lastUpdate;
+    private readonly TimeSpan _rateLimit = TimeSpan.FromSeconds(2);
+
+    private RichPresence _currentPresence = new();
+    private DateTime _presenceLastSent;
+    private bool _presenceNeedsUpdate = false;
+    private bool _presenceIgnoreRateLimit = false;
+
+    // Doesn't really update
+    private readonly RichPresence _mainMenuPresence = new RichPresence()
+    {
+        Details = "In Main Menu",
+        Assets = new Assets()
+        {
+            LargeImageKey = "atlyss_icon",
+            LargeImageText = "ATLYSS"
+        }
+    };
+
+    // Updated dynamically
+    private readonly RichPresence _worldAreaPresence = new()
+    {
+        Assets = new Assets()
+    };
 
     private void Update()
     {
         var now = DateTime.Now;
 
-        if (_lastUpdate + TimeSpan.FromSeconds(2) < now)
+        if (_lastUpdate + TimeSpan.FromSeconds(1) <= now)
         {
             _lastUpdate = now;
 
@@ -47,11 +70,24 @@ public class AtlyssDiscordRPC : BaseUnityPlugin
                 UpdateWorldAreaPresence(Player._mainPlayer, null);
             }
         }
+
+        // Discord's rate limit seems to be one update every 15 seconds, so let's try to buffer updates until then
+        // It might be possible to send more messages as a burst, though
+        if (_presenceNeedsUpdate && (_presenceIgnoreRateLimit || _presenceLastSent + _rateLimit <= now))
+        {
+            _presenceLastSent = now;
+            _presenceNeedsUpdate = false;
+            _presenceIgnoreRateLimit = false;
+            Logger.LogInfo("Trying to send Rich Presence update...");
+            _client.SetPresence(_currentPresence);
+        }
     }
 
     private void Awake()
     {
         _timeStart = DateTime.UtcNow;
+        _presenceLastSent = DateTime.UtcNow;
+
         _client = new DiscordRpcClient(DiscordAppId, pipe: discordPipe)
         {
             Logger = new DiscordRPC.Logging.ConsoleLogger(_logLevel, true)
@@ -62,6 +98,10 @@ public class AtlyssDiscordRPC : BaseUnityPlugin
         _client.OnReady += (sender, e) =>
         {
             Console.WriteLine("Received Ready from user {0}", e.User.Username);
+
+            _presenceLastSent = DateTime.UtcNow;
+            _currentPresence = _mainMenuPresence;
+            _client.SetPresence(_currentPresence);
         };
 
         _client.OnPresenceUpdate += (sender, e) =>
@@ -74,6 +114,11 @@ public class AtlyssDiscordRPC : BaseUnityPlugin
         On.Player.OnPlayerMapInstanceChange += Player_OnPlayerMapInstanceChange;
         On.MainMenuManager.Set_MenuCondition += MainMenuManager_Set_MenuCondition;
         On.PatternInstanceManager.Update += PatternInstanceManager_Update;
+    }
+
+    private void OnDestroy()
+    {
+        _client.Dispose();
     }
 
     private void PatternInstanceManager_Update(On.PatternInstanceManager.orig_Update orig, PatternInstanceManager self)
@@ -94,11 +139,6 @@ public class AtlyssDiscordRPC : BaseUnityPlugin
         }
     }
 
-    private void OnDestroy()
-    {
-        _client.Dispose();
-    }
-
     private void MainMenuManager_Set_MenuCondition(On.MainMenuManager.orig_Set_MenuCondition orig, MainMenuManager self, int _index)
     {
         orig(self, _index);
@@ -112,18 +152,23 @@ public class AtlyssDiscordRPC : BaseUnityPlugin
 
         if (self == Player._mainPlayer)
         {
+            _lastCombatState = false;
+            _lastCombatStateIsBoss = false;
             UpdatePresenceState(PresenceState.ExploringWorld);
             UpdateWorldAreaPresence(self, _new);
         }
     }
 
-    private void SetPresence(RichPresence presence)
+    private void SetPresence(RichPresence presence, bool sendNow = false)
     {
         presence.Timestamps = new Timestamps()
         {
             Start = _timeStart
         };
-        _client.SetPresence(presence);
+
+        _currentPresence = presence;
+        _presenceNeedsUpdate = true;
+        _presenceIgnoreRateLimit = sendNow;
     }
 
     private void UpdatePresenceState(PresenceState state, bool resetTime = false)
@@ -137,23 +182,18 @@ public class AtlyssDiscordRPC : BaseUnityPlugin
 
     private void UpdateMainMenuPresence(MainMenuManager manager)
     {
-        SetPresence(new RichPresence()
-        {
-            Details = "In Main Menu",
-            Assets = new Assets()
-            {
-                LargeImageKey = "atlyss_icon",
-                LargeImageText = "ATLYSS"
-            }
-        });
+        SetPresence(_mainMenuPresence);
     }
 
     private string _lastWorldArea = "";
     private string _lastPlayerName = "";
+    private int _lastLevel = 0;
     private int _lastHealth = 0;
     private int _lastMaxHealth = 0;
     private int _lastMana = 0;
     private int _lastMaxMana = 0;
+    private int _lastStamina = 0;
+    private int _lastMaxStamina = 0;
     private bool _lastCombatState = false;
     private bool _lastCombatStateIsBoss = false;
 
@@ -162,28 +202,74 @@ public class AtlyssDiscordRPC : BaseUnityPlugin
         var worldArea = _lastWorldArea = area?._mapName ?? _lastWorldArea;
 
         var name = _lastPlayerName = player?._nickname ?? _lastPlayerName;
+        var level = _lastLevel = player?._statusEntity._pStats._currentLevel ?? _lastLevel;
 
         var health = _lastHealth = player?._statusEntity._currentHealth ?? _lastHealth;
-        var maxHealth = _lastMaxHealth = player?._statusEntity._pStats._baseStatStruct._maxHealth ?? _lastMaxHealth;
+        var maxHealth = _lastMaxHealth = player?._statusEntity._pStats._newStatStruct._maxHealth ?? _lastMaxHealth;
 
         var mana = _lastMana = player?._statusEntity._currentMana ?? _lastMana;
-        var maxMana = _lastMaxMana = player?._statusEntity._pStats._baseStatStruct._maxMana ?? _lastMaxMana;
+        var maxMana = _lastMaxMana = player?._statusEntity._pStats._newStatStruct._maxMana ?? _lastMaxMana;
+
+        var stamina = _lastStamina = player?._statusEntity._currentStamina ?? _lastStamina;
+        var maxStamina = _lastMaxStamina = player?._statusEntity._pStats._newStatStruct._maxStamina ?? _lastMaxStamina;
 
         var combatState = _lastCombatState;
         var combatIsBoss = _lastCombatStateIsBoss;
 
         var healthPct = maxHealth == 0 ? 0 : Math.Clamp(health * 100 / maxHealth, 0, 100);
         var manaPct = maxMana == 0 ? 0 : Math.Clamp(mana * 100 / maxMana, 0, 100);
+        var staminaPct = maxStamina == 0 ? 0 : Math.Clamp(stamina * 100 / maxStamina, 0, 100);
 
-        SetPresence(new RichPresence()
+        bool displayActual = true;
+
+        var action = "Exploring";
+
+        if (combatState)
+            action = "Fighting in";
+
+        // TODO: This doesn't update correctly in some cases, need to check whenever pattern manager is active in Update()?
+        if (combatState && combatIsBoss)
+            action = "Fighting a boss in";
+
+        var state = $"{name} Lv{level} ({healthPct}% HP {manaPct}% MP)";
+
+        if (displayActual)
+            state = $"{name} Lv{level} ({health}/{maxHealth} HP {mana}/{maxMana} MP)";
+
+        if (healthPct == 0)
+            state = $"{name} Lv{level} (Fainted)";
+
+        bool needsUpdate = false;
+
+        if (_worldAreaPresence.Details != $"{action} {worldArea}")
         {
-            Details = $"{(combatState ? combatIsBoss ? "Fighting boss in" : "Fighting creeps in" : "Exploring")} {worldArea}",
-            State = $"{name} ({healthPct}% HP, {manaPct}% MP)",
-            Assets = new Assets()
-            {
-                LargeImageKey = "atlyss_icon",
-                LargeImageText = "ATLYSS"
-            }
-        });
+            _worldAreaPresence.Details = $"{action} {worldArea}";
+            needsUpdate = true;
+        }
+
+        if (_worldAreaPresence.State != state)
+        {
+            _worldAreaPresence.State = state;
+            needsUpdate = true;
+        }
+
+        if (_worldAreaPresence.Assets.LargeImageKey != "atlyss_icon")
+        {
+            _worldAreaPresence.Assets.LargeImageKey = "atlyss_icon";
+            needsUpdate = true;
+        }
+
+        if (_worldAreaPresence.Assets.LargeImageText != "ATLYSS")
+        {
+            _worldAreaPresence.Assets.LargeImageText = "ATLYSS";
+            needsUpdate = true;
+        }
+
+        if (needsUpdate)
+        {
+            // Set presence
+            // If world area changed, we probably want to update that right away
+            SetPresence(_worldAreaPresence, area != null);
+        }
     }
 }
