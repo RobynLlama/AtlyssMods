@@ -32,7 +32,7 @@ if OS_TYPE == 'Windows':
   SEARCH_PATHS = windows_paths()
   GAME_EXECUTABLE = 'ATLYSS.exe'
 else:
-  print("This script doesn't support your platform yet, try manually specifying ATLYSS_INSTALL in _Utils/InstallPath.props.")
+  print("This script doesn't support your platform yet, try manually specifying ATLYSS_PATH in _Utils/InstallPath.props.")
   sys.exit(1)
 
 print('Searching for the game install in the following paths:')
@@ -46,7 +46,7 @@ for path in SEARCH_PATHS:
     break
 
 if CHOSEN_PATH is None:
-  print("Couldn't determine install path, try manually specifying ATLYSS_INSTALL in _Utils/InstallPath.props.")
+  print("Couldn't determine install path, try manually specifying ATLYSS_PATH in _Utils/InstallPath.props.")
   sys.exit(1)
 
 with open('InstallPath.props', 'r') as f:
@@ -55,15 +55,15 @@ with open('InstallPath.props', 'r') as f:
 match = re.search("<ATLYSS_PATH>(.*)</ATLYSS_PATH>", PROPS_DATA)
 
 if match is None:
-  print("Couldn't determine props location, try manually specifying ATLYSS_INSTALL in _Utils/InstallPath.props.")
+  print("Couldn't determine props location, try manually specifying ATLYSS_PATH in _Utils/InstallPath.props.")
   sys.exit(1)
 
 PREVIOUS_PATH = match.group(1)
 
-print(f"Overriding previous ATLYSS_INSTALL value \"{PREVIOUS_PATH}\"")
+print(f"Overriding previous ATLYSS_PATH value \"{PREVIOUS_PATH}\"")
 
 if not os.path.exists(os.path.join(PREVIOUS_PATH, GAME_EXECUTABLE)):
-  print(f"Note: Previous ATLYSS_INSTALL value might have been invalid!")
+  print(f"Note: Previous ATLYSS_PATH value might have been invalid!")
 
 NEW_PATH = str.replace(fr"<ATLYSS_PATH>{CHOSEN_PATH}</ATLYSS_PATH>", "\\", "\\\\")
 
@@ -72,4 +72,4 @@ NEW_PROPS_DATA = re.sub("<ATLYSS_PATH>(.*)</ATLYSS_PATH>", NEW_PATH, PROPS_DATA)
 with open('InstallPath.props', 'w') as f:
   f.write(NEW_PROPS_DATA)
 
-print(f"Set ATLYSS_INSTALL to {CHOSEN_PATH}")
+print(f"Set ATLYSS_PATH to {CHOSEN_PATH}")

@@ -92,10 +92,6 @@
         </Reference>
 
         <!-- Harmony -->
-        <Reference Include="0Harmony">
-            <HintPath>$(ATLYSS_BEPINEX)\0Harmony.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
         <Reference Include="0Harmony20">
             <HintPath>$(ATLYSS_BEPINEX)\0Harmony20.dll</HintPath>
             <Private>False</Private>
