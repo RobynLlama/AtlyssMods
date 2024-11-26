@@ -1,116 +1,131 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+    <Import Project="_Utils/InstallPath.props"/>
 
+    <!-- Generic assembly info. -->
     <PropertyGroup>
         <TargetFramework>netstandard2.1</TargetFramework>
         <LangVersion>11</LangVersion>
         <Nullable>disable</Nullable>
         <RootNamespace>Marioalexsan.NoPlayerCap</RootNamespace>
     </PropertyGroup>
-    
-    <PropertyGroup>
-        <ModDependenciesPath>..\..\GameDependencies\</ModDependenciesPath>
-    </PropertyGroup>
 
+    <!-- Uncomment this if you use BepInEx.AutoHookGenPatcher MMHOOK -->
     <ItemGroup>
-        <!-- Atlyss assembly and hooks -->
-        <Reference Include="Assembly-CSharp">
-            <HintPath>$(ModDependenciesPath)Assembly-CSharp.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
         <Reference Include="MMHOOK_Assembly-CSharp">
-            <HintPath>$(ModDependenciesPath)MMHOOK_Assembly-CSharp.dll</HintPath>
+            <HintPath>$(ATLYSS_PATH)\BepInEx\plugins\MMHOOK\Managed\MMHOOK_Assembly-CSharp.dll</HintPath>
             <Private>False</Private>
         </Reference>
-        <Reference Include="PUBLIC-Assembly-CSharp">
-            <HintPath>$(ModDependenciesPath)PUBLIC-Assembly-CSharp.dll</HintPath>
+    </ItemGroup>
+
+    <!-- Publicizer for accessing private identifiers in ATLYSS's assembly. -->
+    <ItemGroup>
+        <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.2" PrivateAssets="all" />
+    </ItemGroup>
+
+    <!-- ATLYSS_Data/Managed assemblies. -->
+    <ItemGroup>
+        <!-- Atlyss assembly. We're also publicizing this with BepInEx.AssemblyPublicizer. -->
+        <Reference Include="Assembly-CSharp" Publicize="true">
+            <HintPath>$(ATLYSS_MANAGED)\Assembly-CSharp.dll</HintPath>
             <Private>False</Private>
         </Reference>
-        
-        <!-- Other dependencies -->
+
+        <!-- Third party modules. -->
         <Reference Include="com.rlabrecque.steamworks.net">
-            <HintPath>$(ModDependenciesPath)com.rlabrecque.steamworks.net.dll</HintPath>
+            <HintPath>$(ATLYSS_MANAGED)\com.rlabrecque.steamworks.net.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="FizzySteamworks">
+            <HintPath>$(ATLYSS_MANAGED)\FizzySteamworks.dll</HintPath>
             <Private>False</Private>
         </Reference>
         <Reference Include="Mirror">
-            <HintPath>$(ModDependenciesPath)Mirror.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        
-        <!-- BepInEx -->
-        <Reference Include="BepInEx">
-            <HintPath>$(ModDependenciesPath)BepInEx.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="BepInEx.Harmony">
-            <HintPath>$(ModDependenciesPath)BepInEx.Harmony.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="BepInEx.Preloader">
-            <HintPath>$(ModDependenciesPath)BepInEx.Preloader.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        
-        <!-- Harmony -->
-        <Reference Include="0Harmony">
-            <HintPath>$(ModDependenciesPath)0Harmony.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="0Harmony20">
-            <HintPath>$(ModDependenciesPath)0Harmony20.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="HarmonyXInterop">
-            <HintPath>$(ModDependenciesPath)HarmonyXInterop.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        
-        <!-- Mono -->
-        <Reference Include="Mono.Cecil">
-            <HintPath>$(ModDependenciesPath)Mono.Cecil.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="Mono.Cecil.Mdb">
-            <HintPath>$(ModDependenciesPath)Mono.Cecil.Mdb.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="Mono.Cecil.Pdb">
-            <HintPath>$(ModDependenciesPath)Mono.Cecil.Pdb.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="Mono.Cecil.Rocks">
-            <HintPath>$(ModDependenciesPath)Mono.Cecil.Rocks.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        
-        <!-- MonoMod -->
-        <Reference Include="MonoMod">
-            <HintPath>$(ModDependenciesPath)MonoMod.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="MonoMod.RuntimeDetour">
-            <HintPath>$(ModDependenciesPath)MonoMod.RuntimeDetour.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="MonoMod.Utils">
-            <HintPath>$(ModDependenciesPath)MonoMod.Utils.dll</HintPath>
+            <HintPath>$(ATLYSS_MANAGED)\Mirror.dll</HintPath>
             <Private>False</Private>
         </Reference>
 
-        <!-- Unity -->
+        <!-- Unity. Add any other assemblies as needed, not all of them were listed here. -->
         <Reference Include="UnityEngine">
-            <HintPath>$(ModDependenciesPath)UnityEngine.dll</HintPath>
+            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="UnityEngine.AudioModule">
+            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.AudioModule.dll</HintPath>
             <Private>False</Private>
         </Reference>
         <Reference Include="UnityEngine.JSONSerializeModule">
-            <HintPath>$(ModDependenciesPath)UnityEngine.JSONSerializeModule.dll</HintPath>
+            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.JSONSerializeModule.dll</HintPath>
             <Private>False</Private>
         </Reference>
         <Reference Include="UnityEngine.CoreModule">
-            <HintPath>$(ModDependenciesPath)UnityEngine.CoreModule.dll</HintPath>
+            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.CoreModule.dll</HintPath>
             <Private>False</Private>
         </Reference>
         <Reference Include="UnityEngine.UI">
-            <HintPath>$(ModDependenciesPath)UnityEngine.UI.dll</HintPath>
+            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.UI.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+    </ItemGroup>
+
+    <!-- BepInEx/core assemblies. -->
+    <ItemGroup>
+        <!-- BepInEx -->
+        <Reference Include="BepInEx">
+            <HintPath>$(ATLYSS_BEPINEX)\BepInEx.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="BepInEx.Harmony">
+            <HintPath>$(ATLYSS_BEPINEX)\BepInEx.Harmony.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="BepInEx.Preloader">
+            <HintPath>$(ATLYSS_BEPINEX)\BepInEx.Preloader.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+
+        <!-- Harmony -->
+        <Reference Include="0Harmony">
+            <HintPath>$(ATLYSS_BEPINEX)\0Harmony.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="0Harmony20">
+            <HintPath>$(ATLYSS_BEPINEX)\0Harmony20.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="HarmonyXInterop">
+            <HintPath>$(ATLYSS_BEPINEX)\HarmonyXInterop.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+
+        <!-- Mono -->
+        <Reference Include="Mono.Cecil">
+            <HintPath>$(ATLYSS_BEPINEX)\Mono.Cecil.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="Mono.Cecil.Mdb">
+            <HintPath>$(ATLYSS_BEPINEX)\Mono.Cecil.Mdb.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="Mono.Cecil.Pdb">
+            <HintPath>$(ATLYSS_BEPINEX)\Mono.Cecil.Pdb.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="Mono.Cecil.Rocks">
+            <HintPath>$(ATLYSS_BEPINEX)\Mono.Cecil.Rocks.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+
+        <!-- MonoMod -->
+        <Reference Include="MonoMod">
+            <HintPath>$(ATLYSS_BEPINEX)\MonoMod.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="MonoMod.RuntimeDetour">
+            <HintPath>$(ATLYSS_BEPINEX)\MonoMod.RuntimeDetour.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="MonoMod.Utils">
+            <HintPath>$(ATLYSS_BEPINEX)\MonoMod.Utils.dll</HintPath>
             <Private>False</Private>
         </Reference>
     </ItemGroup>

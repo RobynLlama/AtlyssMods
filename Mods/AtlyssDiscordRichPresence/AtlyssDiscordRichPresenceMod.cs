@@ -33,7 +33,7 @@ public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
     private static int discordPipe = -1;
 
     private DateTime _lastUpdate;
-    private readonly TimeSpan _rateLimit = TimeSpan.FromSeconds(2);
+    private readonly TimeSpan _rateLimit = TimeSpan.FromSeconds(1);
 
     private RichPresence _currentPresence = new();
     private DateTime _presenceLastSent;
@@ -60,15 +60,10 @@ public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
     private void Update()
     {
         var now = DateTime.Now;
-
-        if (_lastUpdate + TimeSpan.FromSeconds(1) <= now)
+        
+        if (_presenceState == PresenceState.ExploringWorld)
         {
-            _lastUpdate = now;
-
-            if (_presenceState == PresenceState.ExploringWorld)
-            {
-                UpdateWorldAreaPresence(Player._mainPlayer, null);
-            }
+            UpdateWorldAreaPresence(Player._mainPlayer, null);
         }
 
         // Discord's rate limit seems to be one update every 15 seconds, so let's try to buffer updates until then
