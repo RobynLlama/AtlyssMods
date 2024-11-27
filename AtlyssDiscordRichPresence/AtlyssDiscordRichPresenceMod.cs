@@ -14,7 +14,7 @@ using BepInEx.Logging;
 
 namespace Marioalexsan.AtlyssDiscordRichPresence;
 
-[BepInPlugin("Marioalexsan.AtlyssDiscordRPC", "Discord Rich Presence for Atlyss", "1.0.0")]
+[BepInPlugin("Marioalexsan.AtlyssDiscordRichPresence", "Discord Rich Presence for ATLYSS", "1.0.0")]
 public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
 {
     private enum PresenceState
