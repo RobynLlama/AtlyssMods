@@ -6,6 +6,7 @@ using DiscordRPC.Logging;
 using DiscordRPC;
 using UnityEngine;
 using BepInEx.Logging;
+using HarmonyLib;
 
 #pragma warning disable CS0618
 
@@ -14,9 +15,12 @@ using BepInEx.Logging;
 
 namespace Marioalexsan.AtlyssDiscordRichPresence;
 
-[BepInPlugin("Marioalexsan.AtlyssDiscordRichPresence", "Discord Rich Presence for ATLYSS", "1.0.0")]
+[BepInPlugin("Marioalexsan.AtlyssDiscordRichPresence", "DiscordRichPresence", "1.0.0")]
 public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
 {
+    private Harmony _harmony;
+    public static AtlyssDiscordRichPresenceMod Instance { get; private set; }
+
     private enum PresenceState
     {
         MainMenu,
@@ -80,6 +84,10 @@ public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
 
     private void Awake()
     {
+        _harmony = new Harmony("Marioalexsan.NoPlayerCap");
+        _harmony.PatchAll();
+
+        Instance = this;
         _timeStart = DateTime.UtcNow;
         _presenceLastSent = DateTime.UtcNow;
 
@@ -105,10 +113,6 @@ public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
         };
 
         _client.Initialize();
-
-        On.Player.OnPlayerMapInstanceChange += Player_OnPlayerMapInstanceChange;
-        On.MainMenuManager.Set_MenuCondition += MainMenuManager_Set_MenuCondition;
-        On.PatternInstanceManager.Update += PatternInstanceManager_Update;
     }
 
     private void OnDestroy()
@@ -116,10 +120,8 @@ public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
         _client.Dispose();
     }
 
-    private void PatternInstanceManager_Update(On.PatternInstanceManager.orig_Update orig, PatternInstanceManager self)
+    internal void PatternInstanceManager_Update(PatternInstanceManager self)
     {
-        orig(self);
-
         bool isBoss = (bool)self._muBossSrc && self._muBossSrc.isPlaying && self._muBossSrc.volume > 0.1f;
         bool isAction = (bool)self._muActionSrc && self._muActionSrc.isPlaying && self._muActionSrc.volume > 0.1f;
         bool inCombat = isBoss || isAction;
@@ -134,17 +136,14 @@ public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
         }
     }
 
-    private void MainMenuManager_Set_MenuCondition(On.MainMenuManager.orig_Set_MenuCondition orig, MainMenuManager self, int _index)
+    internal void MainMenuManager_Set_MenuCondition(MainMenuManager self)
     {
-        orig(self, _index);
         UpdatePresenceState(PresenceState.MainMenu);
         UpdateMainMenuPresence(self);
     }
 
-    private void Player_OnPlayerMapInstanceChange(On.Player.orig_OnPlayerMapInstanceChange orig, Player self, MapInstance _old, MapInstance _new)
+    internal void Player_OnPlayerMapInstanceChange(Player self, MapInstance _new)
     {
-        orig(self, _old, _new);
-
         if (self == Player._mainPlayer)
         {
             _lastCombatState = false;

@@ -1,5 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-    <Import Project="_Utils/InstallPath.props"/>
+    <Import Project="_Utils/InstallPath.props" />
 
     <!-- Generic assembly info. -->
     <PropertyGroup>
@@ -18,12 +18,12 @@
     </ItemGroup>
 
     <!-- Uncomment this if you use BepInEx.AutoHookGenPatcher MMHOOK -->
-    <ItemGroup>
+    <!--<ItemGroup>
         <Reference Include="MMHOOK_Assembly-CSharp">
             <HintPath>$(ATLYSS_PATH)\BepInEx\plugins\MMHOOK\Managed\MMHOOK_Assembly-CSharp.dll</HintPath>
             <Private>False</Private>
         </Reference>
-    </ItemGroup>
+    </ItemGroup>-->
 
     <!-- Publicizer for accessing private identifiers in ATLYSS's assembly. -->
     <ItemGroup>

@@ -6,7 +6,7 @@
         <TargetFramework>net472</TargetFramework>
         <AssemblyName>AllowAnyNames</AssemblyName>
         <RootNamespace>Marioalexsan.AllowAnyNames</RootNamespace>
-        <Product>Removes player name validation for hosts.</Product>
+        <Product>AllowAnyNames</Product>
         <Version>1.0.0</Version>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>latest</LangVersion>

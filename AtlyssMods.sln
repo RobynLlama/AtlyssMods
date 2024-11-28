@@ -9,6 +9,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AtlyssDiscordRichPresence",
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AllowAnyNamesMod", "AllowAnyNames\AllowAnyNamesMod.csproj", "{A239F579-9D96-4595-AA67-38DDB1DF126B}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ModAwareMultiplayer", "ModAwareMultiplayer\ModAwareMultiplayer.csproj", "{594E0533-35FD-46E2-8935-9FD6A798B1DC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{A239F579-9D96-4595-AA67-38DDB1DF126B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A239F579-9D96-4595-AA67-38DDB1DF126B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A239F579-9D96-4595-AA67-38DDB1DF126B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{594E0533-35FD-46E2-8935-9FD6A798B1DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{594E0533-35FD-46E2-8935-9FD6A798B1DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{594E0533-35FD-46E2-8935-9FD6A798B1DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{594E0533-35FD-46E2-8935-9FD6A798B1DC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
