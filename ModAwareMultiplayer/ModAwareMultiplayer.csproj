@@ -4,7 +4,7 @@
     <!-- Generic assembly info. -->
     <PropertyGroup>
         <!-- use "net48" target if you need to work with ILGenerator -->
-        <TargetFramework>netstandard2.1</TargetFramework>
+        <TargetFramework>net48</TargetFramework>
         <AssemblyName>ModAwareMultiplayer</AssemblyName>
         <RootNamespace>Marioalexsan.ModAwareMultiplayer</RootNamespace>
         <Product>Handles interaction between vanilla and modded game instances</Product>

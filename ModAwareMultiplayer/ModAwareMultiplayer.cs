@@ -2,6 +2,7 @@
 using System.Security.Permissions;
 using BepInEx;
 using HarmonyLib;
+using UnityEngine;
 
 #pragma warning disable CS0618
 
@@ -10,14 +11,16 @@ using HarmonyLib;
 
 namespace Marioalexsan.ModAwareMultiplayer;
 
-[BepInPlugin("Marioalexsan.ModAwareMultiplayer", "Template mod for Atlyss using BepInEx", "1.0.0")]
+[BepInPlugin("Marioalexsan.ModAwareMultiplayer", "ModAwareMultiplayer", "1.0.0")]
 public class ModAwareMultiplayer : BaseUnityPlugin
 {
+    public static string ModdedNetworkApplicationVersion { get; private set; }
+
     private void Awake()
     {
         var harmony = new Harmony("Marioalexsan.ModAwareMultiplayer");
         harmony.PatchAll();
 
-        UnityEngine.Debug.Log("Hello from Marioalexsan.ModAwareMultiplayer!");
+        ModdedNetworkApplicationVersion = Application.version + " (modded)";
     }
 }
