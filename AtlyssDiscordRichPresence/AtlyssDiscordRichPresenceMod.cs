@@ -7,6 +7,7 @@ using DiscordRPC;
 using UnityEngine;
 using BepInEx.Logging;
 using HarmonyLib;
+using BepInEx.Configuration;
 
 #pragma warning disable CS0618
 
@@ -15,9 +16,15 @@ using HarmonyLib;
 
 namespace Marioalexsan.AtlyssDiscordRichPresence;
 
-[BepInPlugin("Marioalexsan.AtlyssDiscordRichPresence", "DiscordRichPresence", "1.0.0")]
+public class ModAwareMultiplayerVanillaCompatibleAttribute : Attribute { }
+
+[BepInPlugin("Marioalexsan.AtlyssDiscordRichPresence", "AtlyssDiscordRichPresence", "1.0.0")]
+[ModAwareMultiplayerVanillaCompatible]
 public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
 {
+    private readonly Display _display = new();
+    private readonly GameState _state = new();
+
     private Harmony _harmony;
     public static AtlyssDiscordRichPresenceMod Instance { get; private set; }
 
@@ -84,6 +91,8 @@ public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
 
     private void Awake()
     {
+        InitializeConfiguration();
+
         _harmony = new Harmony("Marioalexsan.NoPlayerCap");
         _harmony.PatchAll();
 
@@ -113,6 +122,17 @@ public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
         };
 
         _client.Initialize();
+    }
+
+    private void InitializeConfiguration()
+    {
+        _display.PlayerAlive = Config.Bind(nameof(Display), nameof(Display.PlayerAlive), _display.PlayerAlive, Display.PlayerAliveNote).Value;
+        _display.PlayerDead = Config.Bind(nameof(Display), nameof(Display.PlayerDead), _display.PlayerDead, Display.PlayerDeadNote).Value;
+        _display.MainMenu = Config.Bind(nameof(Display), nameof(Display.MainMenu), _display.MainMenu, Display.MainMenuNote).Value;
+        _display.Exploring = Config.Bind(nameof(Display), nameof(Display.Exploring), _display.Exploring, Display.ExploringNote).Value;
+        _display.Idle = Config.Bind(nameof(Display), nameof(Display.Idle), _display.Idle, Display.IdleNote).Value;
+        _display.FightingInArena = Config.Bind(nameof(Display), nameof(Display.FightingInArena), _display.FightingInArena, Display.FightingInArenaNote).Value;
+        _display.FightingBoss = Config.Bind(nameof(Display), nameof(Display.FightingBoss), _display.FightingBoss, Display.FightingBossNote).Value;
     }
 
     private void OnDestroy()

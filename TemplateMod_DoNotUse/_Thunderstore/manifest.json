@@ -1,0 +1,9 @@
+{
+  "name": "Atlyss_Template_Mod",
+  "version_number": "1.0.0",
+  "website_url": "https://store.steampowered.com/app/2768430/ATLYSS/",
+  "description": "Template mod for ATLYSS",
+  "containsNsfwContent": false,
+  "dependencies": [
+  ]
+}

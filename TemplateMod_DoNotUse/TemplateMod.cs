@@ -1,5 +1,4 @@
-﻿using System;
-using System.Security;
+﻿using System.Security;
 using System.Security.Permissions;
 using BepInEx;
 using HarmonyLib;
@@ -9,12 +8,9 @@ using HarmonyLib;
 [module: UnverifiableCode]
 [assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification = true)]
 
-namespace Marioalexsan.NoPlayerCap;
+namespace Marioalexsan.TemplateMod;
 
-public class ModAwareMultiplayerVanillaCompatibleAttribute : Attribute { }
-
-[BepInPlugin("Marioalexsan.NoPlayerCap", "NoPlayerCap", "1.0.0")]
-[ModAwareMultiplayerVanillaCompatible]
+[BepInPlugin("Marioalexsan.TemplateMod", "TemplateMod", "1.0.0")]
 public class NoPlayerCapMod : BaseUnityPlugin
 {
     private Harmony _harmony;

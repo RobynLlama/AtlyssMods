@@ -8,9 +8,10 @@
         <AssemblyName>ModAwareMultiplayer</AssemblyName>
         <RootNamespace>Marioalexsan.ModAwareMultiplayer</RootNamespace>
         <Product>Handles interaction between vanilla and modded game instances</Product>
-        <Version>1.0.0</Version>
+        <Version>1.1.0</Version>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>latest</LangVersion>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>
 
     <!-- Uncomment this if you use BepInEx.AutoHookGenPatcher MMHOOK -->
@@ -135,13 +136,10 @@
             <Private>False</Private>
         </Reference>
     </ItemGroup>
-    <ItemGroup>
-      <Folder Include="Thunderstore\Output\" />
-    </ItemGroup>
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-      <Exec Command="python _Utils/pack_game.py" ContinueOnError="true" />
+        <Exec Command="python _Utils/pack_game.py" ContinueOnError="true" />
     </Target>
     <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-      <Exec Command="python _Utils/find_game.py" ContinueOnError="true" />
+        <Exec Command="python _Utils/find_game.py" ContinueOnError="true" />
     </Target>
 </Project>

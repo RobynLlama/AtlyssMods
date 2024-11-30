@@ -23,7 +23,7 @@ static class VersionPatches
         yield return AccessTools.Method(typeof(SteamLobby), nameof(SteamLobby.OnLobbyCreated));
     }
 
-    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> code)
+    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> code, MethodBase original)
     {
         var matcher = new CodeMatcher(code)
             .MatchForward(false, [
@@ -36,11 +36,25 @@ static class VersionPatches
         matcher
             .RemoveInstruction()
             .Insert([
-                new CodeInstruction(OpCodes.Call, AccessTools.Property(typeof(ModAwareMultiplayer), nameof(ModAwareMultiplayer.ModdedNetworkApplicationVersion)).GetGetMethod())
+                GetPropertyToUse(original)
                 ]);
 
         matcher.Instruction.labels = labels;
 
         return matcher.InstructionEnumeration();
+    }
+
+    static CodeInstruction GetPropertyToUse(MethodBase original)
+    {
+        if (original.Name.Contains("_joinButtonInteractable") || original.Name == nameof(LobbyListManager.Iterate_SteamLobbies))
+        {
+            // Used for version check
+            return new CodeInstruction(OpCodes.Call, AccessTools.Property(typeof(ModAwareMultiplayer), nameof(ModAwareMultiplayer.ModdedNetworkApplicationVersion)).GetGetMethod());
+        }
+        else
+        {
+            // Used for display only
+            return new CodeInstruction(OpCodes.Call, AccessTools.Property(typeof(ModAwareMultiplayer), nameof(ModAwareMultiplayer.ModdedDisplayApplicationVersion)).GetGetMethod());
+        }
     }
 }

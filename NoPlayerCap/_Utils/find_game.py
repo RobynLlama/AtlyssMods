@@ -35,9 +35,7 @@ else:
   print("This script doesn't support your platform yet, try manually specifying ATLYSS_PATH in _Utils/InstallPath.props.")
   sys.exit(1)
 
-print('Searching for the game install in the following paths:')
-for path in SEARCH_PATHS:
-  print(f'  - {path}')
+print(f'Searching for the game install in {len(SEARCH_PATHS)} paths.')
 
 CHOSEN_PATH = None
 for path in SEARCH_PATHS:
@@ -60,10 +58,14 @@ if match is None:
 
 PREVIOUS_PATH = match.group(1)
 
-print(f"Overriding previous ATLYSS_PATH value \"{PREVIOUS_PATH}\"")
-
 if not os.path.exists(os.path.join(PREVIOUS_PATH, GAME_EXECUTABLE)):
-  print(f"Note: Previous ATLYSS_PATH value might have been invalid!")
+  print(f"Previous ATLYSS_PATH {PREVIOUS_PATH} is invalid!")
+  print(f"Overriding ATLYSS_PATH value with {CHOSEN_PATH}")
+else:
+  print(f"Previous ATLYSS_PATH {PREVIOUS_PATH} seems valid, won't overwrite it.")
+  print(f"The detected path was {CHOSEN_PATH} in case you need it.")
+  sys.exit(0)
+  
 
 NEW_PATH = str.replace(fr"<ATLYSS_PATH>{CHOSEN_PATH}</ATLYSS_PATH>", "\\", "\\\\")
 

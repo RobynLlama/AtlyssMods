@@ -4,9 +4,13 @@
     <!-- Generic assembly info. -->
     <PropertyGroup>
         <TargetFramework>netstandard2.1</TargetFramework>
-        <LangVersion>11</LangVersion>
-        <Nullable>disable</Nullable>
+        <AssemblyName>NoPlayerCap</AssemblyName>
         <RootNamespace>Marioalexsan.NoPlayerCap</RootNamespace>
+        <Product>Significantly raises server max players cap</Product>
+        <Version>1.0.0</Version>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <LangVersion>latest</LangVersion>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>
 
     <!-- Uncomment this if you use BepInEx.AutoHookGenPatcher MMHOOK -->
@@ -124,5 +128,11 @@
             <HintPath>$(ATLYSS_BEPINEX)\MonoMod.Utils.dll</HintPath>
             <Private>False</Private>
         </Reference>
-    </ItemGroup>
+    </ItemGroup>    
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+        <Exec Command="python _Utils/pack_game.py" ContinueOnError="true" />
+    </Target>
+    <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+        <Exec Command="python _Utils/find_game.py" ContinueOnError="true" />
+    </Target>
 </Project>

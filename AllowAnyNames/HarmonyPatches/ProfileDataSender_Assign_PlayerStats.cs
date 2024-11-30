@@ -30,7 +30,11 @@ static class ProfileDataSender_Assign_PlayerStats
             Throw("Failed to find load arg/loc for start.");
 
         matcher.MatchForward(true, [
-            new CodeMatch(OpCodes.Ldstr, "Null")
+            new CodeMatch((ins) => 
+            ins.opcode == OpCodes.Ldstr && 
+            ins.operand != null && 
+            ins.operand.GetType() == typeof(string) && 
+            string.Equals((string)ins.operand, "Null", StringComparison.InvariantCultureIgnoreCase))
             ]);
 
         if (matcher.IsInvalid)

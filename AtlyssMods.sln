@@ -11,6 +11,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AllowAnyNamesMod", "AllowAn
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ModAwareMultiplayer", "ModAwareMultiplayer\ModAwareMultiplayer.csproj", "{594E0533-35FD-46E2-8935-9FD6A798B1DC}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SettingsPlus", "SettingsPlus\SettingsPlus.csproj", "{E877A1FF-0F06-46EC-AC53-A212C7E1DB3F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{594E0533-35FD-46E2-8935-9FD6A798B1DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{594E0533-35FD-46E2-8935-9FD6A798B1DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{594E0533-35FD-46E2-8935-9FD6A798B1DC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E877A1FF-0F06-46EC-AC53-A212C7E1DB3F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E877A1FF-0F06-46EC-AC53-A212C7E1DB3F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E877A1FF-0F06-46EC-AC53-A212C7E1DB3F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E877A1FF-0F06-46EC-AC53-A212C7E1DB3F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
