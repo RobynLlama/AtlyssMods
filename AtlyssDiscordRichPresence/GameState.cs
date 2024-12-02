@@ -46,8 +46,13 @@ public class GameState
             [States.PLAYERNAME] = () => $"{PlayerName}",
             [States.PLAYERRACE] = () => $"{PlayerRace}",
             [States.PLAYERCLASS] = () => $"{PlayerClass}",
+            [States.PLAYERRACEANDCLASS] = () => $"{PlayerRace} {PlayerClass}".Trim(),
 
-            [States.WORLDAREA] = () => $"{WorldArea}"
+            [States.WORLDAREA] = () => $"{WorldArea}",
+
+            [States.SERVERNAME] = () => $"{ServerName}",
+            [States.PLAYERS] = () => $"{Players}",
+            [States.MAXPLAYERS] = () => $"{MaxPlayers}"
         };
     }
 
@@ -76,11 +81,15 @@ public class GameState
 
     public string WorldArea { get; set; }
 
-    // Not displayable
+    // Not configurable / displayable
 
-    public bool InCombat { get; set; }
     public bool InArenaCombat { get; set; }
     public bool InBossCombat { get; set; }
+
+    public bool InMultiplayer { get; set; }
+    public int Players { get; set; }
+    public int MaxPlayers { get; set; }
+    public string ServerName { get; set; }
 
     public void UpdateData(MapInstance area)
     {
@@ -108,7 +117,15 @@ public class GameState
         ExperienceForNextLevel = player._statusEntity._pStats.Network_statStruct._experience;
 
         PlayerName = player.Network_nickname;
-        PlayerRace = player._pVisual._playerRaceModel.name;
-        PlayerClass = player._pStats._class.name;
+        PlayerRace = player._pVisual._playerAppearanceStruct._setRaceTag ?? "";
+
+        if ((bool)player._pStats._class)
+        {
+            PlayerClass = player._pStats._class._className ?? "";
+        }
+        else
+        {
+            PlayerClass = GameManager._current._statLogics._emptyClassName ?? "";
+        }
     }
 }

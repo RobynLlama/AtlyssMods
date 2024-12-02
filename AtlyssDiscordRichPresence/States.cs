@@ -26,6 +26,11 @@ public static class States
     public const string PLAYERNAME = "PLAYERNAME";
     public const string PLAYERRACE = "PLAYERRACE";
     public const string PLAYERCLASS = "PLAYERCLASS";
+    public const string PLAYERRACEANDCLASS = "PLAYERRACEANDCLASS";
 
     public const string WORLDAREA = "WORLDAREA";
+
+    public const string SERVERNAME = "SERVERNAME";
+    public const string PLAYERS = "PLAYERS";
+    public const string MAXPLAYERS = "MAXPLAYERS";
 }

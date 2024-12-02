@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace Marioalexsan.ModAwareMultiplayer.HarmonyPatches;
 
-[HarmonyPatch]
+//[HarmonyPatch]
 static class VersionPatches
 {
     static IEnumerable<MethodInfo> TargetMethods()

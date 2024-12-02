@@ -18,110 +18,74 @@ namespace Marioalexsan.AtlyssDiscordRichPresence;
 
 public class ModAwareMultiplayerVanillaCompatibleAttribute : Attribute { }
 
-[BepInPlugin("Marioalexsan.AtlyssDiscordRichPresence", "AtlyssDiscordRichPresence", "1.0.0")]
+[BepInPlugin("Marioalexsan.AtlyssDiscordRichPresence", "AtlyssDiscordRichPresence", "1.1.0")]
 [ModAwareMultiplayerVanillaCompatible]
 public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
 {
+    public static AtlyssDiscordRichPresenceMod Instance { get; private set; }
+
+    private const string DiscordAppId = "1309967280842735738";
+
     private readonly Display _display = new();
     private readonly GameState _state = new();
 
+    private RichPresenceWrapper _richPresence;
     private Harmony _harmony;
-    public static AtlyssDiscordRichPresenceMod Instance { get; private set; }
 
-    private enum PresenceState
+    public bool ModEnabled { get; private set; } = true;
+
+    private enum TimerTrackerState
     {
         MainMenu,
         ExploringWorld
     }
 
-    private PresenceState _presenceState = PresenceState.MainMenu;
+    private TimerTrackerState _timeTrackerState;
 
-    private static readonly string DiscordAppId = "1309967280842735738";
-    private DiscordRpcClient _client;
-    private DateTime _timeStart;
-
-    private static DiscordRPC.Logging.LogLevel _logLevel = DiscordRPC.Logging.LogLevel.Trace;
-    private static int discordPipe = -1;
-
-    private DateTime _lastUpdate;
-    private readonly TimeSpan _rateLimit = TimeSpan.FromSeconds(1);
-
-    private RichPresence _currentPresence = new();
-    private DateTime _presenceLastSent;
-    private bool _presenceNeedsUpdate = false;
-    private bool _presenceIgnoreRateLimit = false;
-
-    // Doesn't really update
-    private readonly RichPresence _mainMenuPresence = new RichPresence()
+    private void UpdatePresence(PresenceData data, TimerTrackerState state)
     {
-        Details = "In Main Menu",
-        Assets = new Assets()
-        {
-            LargeImageKey = "atlyss_icon",
-            LargeImageText = "ATLYSS"
-        }
-    };
-
-    // Updated dynamically
-    private readonly RichPresence _worldAreaPresence = new()
-    {
-        Assets = new Assets()
-    };
+        _richPresence.SetPresence(data, _timeTrackerState != state);
+        _timeTrackerState = state;
+    }
 
     private void Update()
     {
-        var now = DateTime.Now;
-        
-        if (_presenceState == PresenceState.ExploringWorld)
+        if (_timeTrackerState == TimerTrackerState.ExploringWorld)
         {
             UpdateWorldAreaPresence(Player._mainPlayer, null);
         }
 
-        // Discord's rate limit seems to be one update every 15 seconds, so let's try to buffer updates until then
-        // It might be possible to send more messages as a burst, though
-        if (_presenceNeedsUpdate && (_presenceIgnoreRateLimit || _presenceLastSent + _rateLimit <= now))
+        if (
+            (bool)AtlyssNetworkManager._current &&
+            !AtlyssNetworkManager._current._soloMode && 
+            !(AtlyssNetworkManager._current._steamworksMode && !SteamManager.Initialized) &&
+            (bool)Player._mainPlayer
+            )
         {
-            _presenceLastSent = now;
-            _presenceNeedsUpdate = false;
-            _presenceIgnoreRateLimit = false;
-            Logger.LogInfo("Trying to send Rich Presence update...");
-            _client.SetPresence(_currentPresence);
+            _state.InMultiplayer = true;
+            _state.Players = FindObjectsOfType<Player>().Length;
+            _state.MaxPlayers = ServerInfoObject._current._maxConnections;
+            _state.ServerName = ServerInfoObject._current._serverName;
         }
+        else
+        {
+            _state.InMultiplayer = false;
+            _state.Players = 1;
+            _state.MaxPlayers = 1;
+        }
+
+        _richPresence.Tick();
     }
 
     private void Awake()
     {
         InitializeConfiguration();
 
-        _harmony = new Harmony("Marioalexsan.NoPlayerCap");
+        _harmony = new Harmony("Marioalexsan.AtlyssDiscordRichPresence");
         _harmony.PatchAll();
 
         Instance = this;
-        _timeStart = DateTime.UtcNow;
-        _presenceLastSent = DateTime.UtcNow;
-
-        _client = new DiscordRpcClient(DiscordAppId, pipe: discordPipe)
-        {
-            Logger = new DiscordRPC.Logging.ConsoleLogger(_logLevel, true)
-        };
-
-        _client.Logger = new ConsoleLogger() { Level = DiscordRPC.Logging.LogLevel.Warning };
-
-        _client.OnReady += (sender, e) =>
-        {
-            Console.WriteLine("Received Ready from user {0}", e.User.Username);
-
-            _presenceLastSent = DateTime.UtcNow;
-            _currentPresence = _mainMenuPresence;
-            _client.SetPresence(_currentPresence);
-        };
-
-        _client.OnPresenceUpdate += (sender, e) =>
-        {
-            Console.WriteLine("Received Update! {0}", e.Presence);
-        };
-
-        _client.Initialize();
+        _richPresence = new(DiscordAppId, DiscordRPC.Logging.LogLevel.Warning, ModEnabled);
     }
 
     private void InitializeConfiguration()
@@ -133,32 +97,30 @@ public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
         _display.Idle = Config.Bind(nameof(Display), nameof(Display.Idle), _display.Idle, Display.IdleNote).Value;
         _display.FightingInArena = Config.Bind(nameof(Display), nameof(Display.FightingInArena), _display.FightingInArena, Display.FightingInArenaNote).Value;
         _display.FightingBoss = Config.Bind(nameof(Display), nameof(Display.FightingBoss), _display.FightingBoss, Display.FightingBossNote).Value;
+        _display.Singleplayer = Config.Bind(nameof(Display), nameof(Display.Singleplayer), _display.Singleplayer, Display.SingleplayerNote).Value;
+        _display.Multiplayer = Config.Bind(nameof(Display), nameof(Display.Multiplayer), _display.Multiplayer, Display.MultiplayerNote).Value;
+
+        ModEnabled = Config.Bind("General", "Enable", true, "Enable or disable this mod. While disabled, no in-game data is shown.").Value;
     }
 
     private void OnDestroy()
     {
-        _client.Dispose();
+        _richPresence.Dispose();
     }
 
     internal void PatternInstanceManager_Update(PatternInstanceManager self)
     {
+        // TODO: Find a better way to get this than music state?
         bool isBoss = (bool)self._muBossSrc && self._muBossSrc.isPlaying && self._muBossSrc.volume > 0.1f;
         bool isAction = (bool)self._muActionSrc && self._muActionSrc.isPlaying && self._muActionSrc.volume > 0.1f;
-        bool inCombat = isBoss || isAction;
 
-        // Update action state if combat state changed
-        if (inCombat != _lastCombatState)
-        {
-            _lastCombatState = inCombat;
-            _lastCombatStateIsBoss = isBoss;
-            Logger.LogInfo("Detected combat state change!");
-            UpdateWorldAreaPresence(null, null);
-        }
+        _state.InArenaCombat = isAction;
+        _state.InBossCombat = isBoss;
+        UpdateWorldAreaPresence(null, null);
     }
 
     internal void MainMenuManager_Set_MenuCondition(MainMenuManager self)
     {
-        UpdatePresenceState(PresenceState.MainMenu);
         UpdateMainMenuPresence(self);
     }
 
@@ -166,124 +128,85 @@ public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
     {
         if (self == Player._mainPlayer)
         {
-            _lastCombatState = false;
-            _lastCombatStateIsBoss = false;
-            UpdatePresenceState(PresenceState.ExploringWorld);
+            _state.InArenaCombat = false;
+            _state.InBossCombat = false;
             UpdateWorldAreaPresence(self, _new);
-        }
-    }
-
-    private void SetPresence(RichPresence presence, bool sendNow = false)
-    {
-        presence.Timestamps = new Timestamps()
-        {
-            Start = _timeStart
-        };
-
-        _currentPresence = presence;
-        _presenceNeedsUpdate = true;
-        _presenceIgnoreRateLimit = sendNow;
-    }
-
-    private void UpdatePresenceState(PresenceState state, bool resetTime = false)
-    {
-        if (_presenceState != state || resetTime)
-        {
-            _timeStart = DateTime.UtcNow;
-            _presenceState = state;
         }
     }
 
     private void UpdateMainMenuPresence(MainMenuManager manager)
     {
-        SetPresence(_mainMenuPresence);
+        UpdatePresence(new()
+        {
+            Details = "In Main Menu",
+            LargeImageKey = "atlyss_icon",
+            LargeImageText = "ATLYSS"
+        }, TimerTrackerState.MainMenu);
     }
-
-    private string _lastWorldArea = "";
-    private string _lastPlayerName = "";
-    private int _lastLevel = 0;
-    private int _lastHealth = 0;
-    private int _lastMaxHealth = 0;
-    private int _lastMana = 0;
-    private int _lastMaxMana = 0;
-    private int _lastStamina = 0;
-    private int _lastMaxStamina = 0;
-    private bool _lastCombatState = false;
-    private bool _lastCombatStateIsBoss = false;
 
     private void UpdateWorldAreaPresence(Player player, MapInstance area)
     {
-        var worldArea = _lastWorldArea = area?._mapName ?? _lastWorldArea;
+        _state.UpdateData(player);
+        _state.UpdateData(area);
 
-        var name = _lastPlayerName = player?._nickname ?? _lastPlayerName;
-        var level = _lastLevel = player?._statusEntity._pStats._currentLevel ?? _lastLevel;
+        var details = _state.ReplaceVars(_display.Exploring);
 
-        var health = _lastHealth = player?._statusEntity._currentHealth ?? _lastHealth;
-        var maxHealth = _lastMaxHealth = player?._statusEntity._pStats.Network_statStruct._maxHealth ?? _lastMaxHealth;
-
-        var mana = _lastMana = player?._statusEntity._currentMana ?? _lastMana;
-        var maxMana = _lastMaxMana = player?._statusEntity._pStats.Network_statStruct._maxMana ?? _lastMaxMana;
-
-        var stamina = _lastStamina = player?._statusEntity._currentStamina ?? _lastStamina;
-        var maxStamina = _lastMaxStamina = player?._statusEntity._pStats.Network_statStruct._maxStamina ?? _lastMaxStamina;
-
-        var combatState = _lastCombatState;
-        var combatIsBoss = _lastCombatStateIsBoss;
-
-        var healthPct = maxHealth == 0 ? 0 : Math.Clamp(health * 100 / maxHealth, 0, 100);
-        var manaPct = maxMana == 0 ? 0 : Math.Clamp(mana * 100 / maxMana, 0, 100);
-        var staminaPct = maxStamina == 0 ? 0 : Math.Clamp(stamina * 100 / maxStamina, 0, 100);
-
-        bool displayActual = true;
-
-        var action = "Exploring";
-
-        if (combatState)
-            action = "Fighting in";
+        if (_state.InArenaCombat)
+            details = _state.ReplaceVars(_display.FightingInArena);
 
         // TODO: This doesn't update correctly in some cases, need to check whenever pattern manager is active in Update()?
-        if (combatState && combatIsBoss)
-            action = "Fighting a boss in";
+        if (_state.InBossCombat)
+            details = _state.ReplaceVars(_display.FightingBoss);
 
-        var state = $"{name} Lv{level} ({healthPct}% HP {manaPct}% MP)";
+        var state = _state.ReplaceVars(_display.PlayerAlive);
 
-        if (displayActual)
-            state = $"{name} Lv{level} ({health}/{maxHealth} HP {mana}/{maxMana} MP)";
+        if (_state.HealthPercentage <= 0)
+            state = _state.ReplaceVars(_display.PlayerDead);
 
-        if (healthPct == 0)
-            state = $"{name} Lv{level} (Fainted)";
-
-        bool needsUpdate = false;
-
-        if (_worldAreaPresence.Details != $"{action} {worldArea}")
+        UpdatePresence(new()
         {
-            _worldAreaPresence.Details = $"{action} {worldArea}";
-            needsUpdate = true;
-        }
-
-        if (_worldAreaPresence.State != state)
-        {
-            _worldAreaPresence.State = state;
-            needsUpdate = true;
-        }
-
-        if (_worldAreaPresence.Assets.LargeImageKey != "atlyss_icon")
-        {
-            _worldAreaPresence.Assets.LargeImageKey = "atlyss_icon";
-            needsUpdate = true;
-        }
-
-        if (_worldAreaPresence.Assets.LargeImageText != "ATLYSS")
-        {
-            _worldAreaPresence.Assets.LargeImageText = "ATLYSS";
-            needsUpdate = true;
-        }
-
-        if (needsUpdate)
-        {
-            // Set presence
-            // If world area changed, we probably want to update that right away
-            SetPresence(_worldAreaPresence, area != null);
-        }
+            Details = details,
+            State = state,
+            LargeImageKey = !_state.InMultiplayer ? Assets.ATLYSS_SINGLEPLAYER : Assets.ATLYSS_MULTIPLAYER,
+            LargeImageText = !_state.InMultiplayer ? _state.ReplaceVars(_display.Singleplayer) : _state.ReplaceVars(_display.Multiplayer),
+            SmallImageKey = MapAreaToIcon(_state.WorldArea),
+            SmallImageText = _state.WorldArea
+        }, TimerTrackerState.ExploringWorld);
     }
+
+    // This doesn't follow the World Portal icons because uhhhhhh reasons
+    private static string MapAreaToIcon(string area) => area.ToLower() switch
+    {
+        // map_dungeon00_sanctumCatacoms
+        "sanctum catacombs" => Assets.ZONESELECTIONICON_DUNGEON,
+        // map_dungeon00_crescentGrove
+        "crescent grove" => Assets.ZONESELECTIONICON_DUNGEON,
+
+        // map_pvp_sanctumArena
+        "sanctum arena" => Assets.ZONESELECTIONICON_ARENA,
+        // map_pvp_catacombsArena
+        "executioner's tomb" => Assets.ZONESELECTIONICON_ARENA,
+
+        // map_hub_sanctum
+        "sanctum" => Assets.ZONESELECTIONICON_SAFE,
+        // map_hub_wallOfTheStars
+        "wall of the stars" => Assets.ZONESELECTIONICON_SAFE,
+
+        // map_zone00_outerSanctumGate
+        "outer sanctum gate" => Assets.ZONESELECTIONICON_FIELD,
+        // map_zone00_outerSanctum
+        "outer sanctum" => Assets.ZONESELECTIONICON_FIELD,
+        // map_zone00_effoldTerrace
+        "effold terrace" => Assets.ZONESELECTIONICON_FIELD,
+        // map_zone00_tuulValley
+        "tuul valley" => Assets.ZONESELECTIONICON_FIELD,
+        // map_zone00_woodreach
+        "woodreach pass" => Assets.ZONESELECTIONICON_FIELD,
+        // map_zone00_crescentKeep
+        "crescent keep" => Assets.ZONESELECTIONICON_FIELD,
+        // map_zone00_gateOfTheMoon
+        "gate of the moon" => Assets.ZONESELECTIONICON_FIELD,
+
+        _ => Assets.ZONESELECTIONICON_FIELD
+    };
 }
