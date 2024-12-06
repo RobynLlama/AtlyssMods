@@ -18,7 +18,7 @@ namespace Marioalexsan.AtlyssDiscordRichPresence;
 
 public class ModAwareMultiplayerVanillaCompatibleAttribute : Attribute { }
 
-[BepInPlugin("Marioalexsan.AtlyssDiscordRichPresence", "AtlyssDiscordRichPresence", "1.1.0")]
+[BepInPlugin("Marioalexsan.AtlyssDiscordRichPresence", "AtlyssDiscordRichPresence", "1.1.1")]
 [ModAwareMultiplayerVanillaCompatible]
 public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
 {
@@ -138,7 +138,7 @@ public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
     {
         UpdatePresence(new()
         {
-            Details = "In Main Menu",
+            Details = _state.ReplaceVars(_display.MainMenu),
             LargeImageKey = "atlyss_icon",
             LargeImageText = "ATLYSS"
         }, TimerTrackerState.MainMenu);
