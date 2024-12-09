@@ -8,9 +8,11 @@ using System.Reflection.Emit;
 using System.Security;
 using System.Security.Permissions;
 using BepInEx;
+using BepInEx.Bootstrap;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
+using Marioalexsan.AutoSaver.HarmonyReversePatches;
 using UnityEngine;
 
 #pragma warning disable CS0618
@@ -18,20 +20,25 @@ using UnityEngine;
 [module: UnverifiableCode]
 [assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification = true)]
 
-namespace Marioalexsan.TemplateMod;
+namespace Marioalexsan.AutoSaver;
 
-[BepInPlugin("Marioalexsan.AutoSaver", "AutoSaver", "1.0.0")]
+[BepInPlugin("Marioalexsan.AutoSaver", "AutoSaver", "1.1.0")]
 public class AutoSaverMod : BaseUnityPlugin
 {
+    public const string MoreBankTabsIndentifier = "com.16mb.morebanktabs";
+
     public new ManualLogSource Logger { get; private set; }
 
     public static AutoSaverMod Instance { get; private set; }
 
     private Harmony _harmony;
     private TimeSpan _elapsedTime;
-    private bool _characterActive;
 
-    private bool AutosaveActive => _characterActive;
+    public bool SaveOnMapChange { get; private set; }
+    public bool CharacterActive { get; private set; }
+    public bool AutosaveActive => CharacterActive;
+    public bool EnableExperimentalFeatures { get; private set; }
+    public KeyCode SaveMultiplayerKeyCode { get; private set; }
 
     private readonly char[] BannedChars = [.. Path.GetInvalidPathChars(), .. Path.GetInvalidFileNameChars()];
 
@@ -52,6 +59,8 @@ public class AutoSaverMod : BaseUnityPlugin
     private TimeSpan _autosaveInterval;
     private int _saveCountToKeep;
 
+    public bool DetectedMoreBankTabsMod { get; private set; } = false;
+
     private void Configure()
     {
         int autosaveMinutes = Config.Bind("General", "BackupInterval", 4, "Interval between save backups, in minutes (min 1, max 60).").Value;
@@ -61,15 +70,20 @@ public class AutoSaverMod : BaseUnityPlugin
 
         _saveCountToKeep = Config.Bind("General", "SavesToKeep", 15, "Maximum number of saves to keep (min 5, max 50).").Value;
         _saveCountToKeep = Math.Max(Math.Min(_saveCountToKeep, 50), 5);
+
+        SaveOnMapChange = Config.Bind("General", "SaveOnMapChange", false, "Set to true to trigger autosaving whenever a new level is loaded.").Value;
+
+        EnableExperimentalFeatures = Config.Bind("Experimental", "EnableExperimentalFeatures", false, "Set to true to enable experimental features.").Value;
+        SaveMultiplayerKeyCode = Config.Bind("Experimental", "SaveMultiplayerKeyCode", KeyCode.KeypadPlus, $"Key to trigger saving other people's saves in multiplayer under the \"Multi\" folder.{Environment.NewLine}Note that saves saved in this way are lackluster.").Value;
     }
 
     internal void GameEntered()
     {
+        Logger.LogInfo("Game entered / map switched. Activating character autosaves.");
         ProfileDataManager._current.Load_ItemStorageData(); // This isn't loaded on start for some reason
         RunAutosaves();
-        Logger.LogInfo("Game entered. Activating character autosaves.");
         _elapsedTime = TimeSpan.Zero;
-        _characterActive = true;
+        CharacterActive = true;
     }
 
     internal void GameExited()
@@ -77,11 +91,21 @@ public class AutoSaverMod : BaseUnityPlugin
         Logger.LogInfo("Game exited. Stopping character autosaves.");
         RunAutosaves();
         _elapsedTime = TimeSpan.Zero;
-        _characterActive = false;
+        CharacterActive = false;
     }
 
     private void Update()
     {
+        if (!DetectedMoreBankTabsMod)
+        {
+            if (Chainloader.PluginInfos.ContainsKey(MoreBankTabsIndentifier))
+            {
+                DetectedMoreBankTabsMod = true;
+                Logger.LogInfo($"Detected MoreBankTabs mod ({MoreBankTabsIndentifier}).");
+                Logger.LogInfo($"Will try to backup the extra bank tabs.");
+            }
+        }
+
         if (AutosaveActive)
         {
             _elapsedTime += TimeSpan.FromSeconds(Time.deltaTime);
@@ -101,6 +125,23 @@ public class AutoSaverMod : BaseUnityPlugin
                 if (!ItemBankAutoSaver.SaveDone)
                 {
                     AutosaveCurrentItemBank();
+                }
+            }
+        }
+
+        if (EnableExperimentalFeatures && Input.GetKeyDown(SaveMultiplayerKeyCode))
+        {
+            Logger.LogInfo("[Experimental] Saving every online player's saves.");
+            
+            foreach (var player in FindObjectsOfType<Player>())
+            {
+                Logger.LogInfo($"Saving player data for {player._nickname}");
+                Directory.CreateDirectory(MultiSavesFolderPath);
+                CharacterAutoSaver.TrySaveSpecificProfileToLocation(player, Path.Combine(MultiSavesFolderPath, SanitizePlayerName(player)));
+
+                if (!CharacterAutoSaver.SaveDone)
+                {
+                    Logger.LogWarning($"Failed to do save for {player._nickname}. Current game status is {player._currentGameCondition}.");
                 }
             }
         }
@@ -127,28 +168,37 @@ public class AutoSaverMod : BaseUnityPlugin
         }
     }
 
-    public string SanitizedPlayerName
+    public string SanitizePlayerName(Player player)
     {
-        get
+        var playerName = player._nickname;
+
+        for (int i = 0; i < BannedChars.Length; i++)
         {
-            var playerName = Player._mainPlayer._nickname;
-
-            for (int i = 0; i < BannedChars.Length; i++)
-            {
-                playerName = playerName.Replace($"{BannedChars[i]}", $"_{i}");
-            }
-
-            return playerName;
+            playerName = playerName.Replace($"{BannedChars[i]}", $"_{i}");
         }
+
+        return playerName;
     }
 
-    private string ModDataFolderName = "Marioalexsan_AutoSaver";
+    public string GetBackupNameForCurrentPlayer()
+    {
+        return $"{SanitizePlayerName(Player._mainPlayer)}_slot{ProfileDataManager._current._selectedFileIndex}";
+    }
+
+    private readonly string ModDataFolderName = "Marioalexsan_AutoSaver";
     private string ModDataFolderPath => Path.Combine(ProfileDataManager._current._dataPath, ModDataFolderName);
     private string CharacterFolderPath => Path.Combine(ModDataFolderPath, "Characters");
     private string ItemBankFolderPath => Path.Combine(ModDataFolderPath, "ItemBank");
+    private string MultiSavesFolderPath => Path.Combine(ModDataFolderPath, "Multi");
 
     private void RunItemBankGarbageCollector()
     {
+        if (!Directory.Exists(ItemBankFolderPath))
+        {
+            Logger.LogWarning($"Couldn't find backup path {ItemBankFolderPath} to run garbage collection for.");
+            return;
+        }
+
         List<string> names = [];
         foreach (var directory in Directory.EnumerateDirectories(ItemBankFolderPath))
         {
@@ -175,8 +225,16 @@ public class AutoSaverMod : BaseUnityPlugin
 
     private void RunCharacterGarbageCollector()
     {
+        var backupPath = Path.Combine(CharacterFolderPath, GetBackupNameForCurrentPlayer());
+
+        if (!Directory.Exists(backupPath))
+        {
+            Logger.LogWarning($"Couldn't find backup path {backupPath} to run garbage collection for.");
+            return;
+        }    
+
         List<string> names = [];
-        foreach (var file in Directory.EnumerateFiles(Path.Combine(CharacterFolderPath, SanitizedPlayerName)))
+        foreach (var file in Directory.EnumerateFiles(backupPath))
         {
             names.Add(Path.GetFileName(file));
         }
@@ -189,7 +247,7 @@ public class AutoSaverMod : BaseUnityPlugin
             var saveToDelete = names[0];
             names.RemoveAt(0);
 
-            var targetPath = Path.Combine(CharacterFolderPath, SanitizedPlayerName, saveToDelete);
+            var targetPath = Path.Combine(CharacterFolderPath, GetBackupNameForCurrentPlayer(), saveToDelete);
 
             // Failsafe
             if (!targetPath.Contains(ModDataFolderName))
@@ -211,6 +269,9 @@ public class AutoSaverMod : BaseUnityPlugin
 
             if (ItemBankAutoSaver.SaveDone)
             {
+                if (DetectedMoreBankTabsMod)
+                    ItemBankAutoSaver.SaveModBankTabsToLocation(itembankFolder);
+
                 var latestSave = Path.Combine(ItemBankFolderPath, "_latest");
                 Directory.CreateDirectory(latestSave);
 
@@ -241,7 +302,7 @@ public class AutoSaverMod : BaseUnityPlugin
             }
 
             Directory.CreateDirectory(ModDataFolderPath);
-            var characterFolder = Path.Combine(CharacterFolderPath, SanitizedPlayerName);
+            var characterFolder = Path.Combine(CharacterFolderPath, GetBackupNameForCurrentPlayer());
             Directory.CreateDirectory(characterFolder);
 
             var filePath = Path.Combine(characterFolder, SanitizedCurrentTime);
@@ -269,7 +330,7 @@ static class Player_OnPlayerMapInstanceChange
 {
     static void Postfix(Player __instance, MapInstance _new)
     {
-        if (__instance == Player._mainPlayer)
+        if (__instance == Player._mainPlayer && (AutoSaverMod.Instance.SaveOnMapChange || !AutoSaverMod.Instance.CharacterActive))
         {
             AutoSaverMod.Instance.GameEntered();
         }
@@ -282,165 +343,5 @@ static class InGameUI_Init_DisconnectGame
     static void Prefix()
     {
         AutoSaverMod.Instance.GameExited();
-    }
-}
-
-[HarmonyPatch(typeof(ProfileDataManager), nameof(ProfileDataManager.Save_ItemStorageData))]
-static class ItemBankAutoSaver
-{
-    public static void TrySaveCurrentProfileToLocation(string location)
-    {
-        if (SaveDone)
-        {
-            AutoSaverMod.Instance.Logger.LogInfo("Triggering item bank save process...");
-        }
-
-        SaveLocationOverride = location;
-        BanksDone = 0;
-        SaveDone = false;
-        SaveProfileData(ProfileDataManager._current);
-    }
-
-    private static string SaveLocationOverride; // Directory
-    private static string TempContents;
-
-    private static int BanksDone = 0;
-    private static int BanksMax = 0;
-    internal static bool SaveDone { get; private set; } = true;
-
-    [HarmonyReversePatch]
-    private static void SaveProfileData(ProfileDataManager __instance)
-    {
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> data)
-        {
-            var matcher = new CodeMatcher(data);
-
-            // Strategy: everywhere the save is about to be saved, drop the input path and use our own
-
-            int patchLocations = 0;
-
-            while (true)
-            {
-                matcher.MatchForward(false,
-                    new CodeMatch(OpCodes.Call, SymbolExtensions.GetMethodInfo(() => File.WriteAllText(null, null)))
-                    );
-
-                if (matcher.IsInvalid)
-                    break;
-
-                patchLocations++;
-
-                matcher.InsertAndAdvance(
-                    new CodeInstruction(OpCodes.Stsfld, AccessTools.Field(typeof(ItemBankAutoSaver), nameof(TempContents))),
-                    new CodeInstruction(OpCodes.Pop),
-                    new CodeInstruction(OpCodes.Ldsfld, AccessTools.Field(typeof(ItemBankAutoSaver), nameof(SaveLocationOverride))),
-                    new CodeInstruction(OpCodes.Call, SymbolExtensions.GetMethodInfo(() => MarkSaveDone(null))),
-                    new CodeInstruction(OpCodes.Ldsfld, AccessTools.Field(typeof(ItemBankAutoSaver), nameof(TempContents)))
-                    );
-
-                matcher.Advance(1);
-            }
-
-            const int expectedLocations = 3;
-
-            if (patchLocations != expectedLocations)
-            {
-                AutoSaverMod.Instance.Logger.LogWarning($"WARNING: Expected {expectedLocations} patch locations, got {patchLocations}.");
-                AutoSaverMod.Instance.Logger.LogWarning($"The mod might behave incorrectly as a result. You should tell the mod developer about this.");
-            }
-
-            BanksMax = expectedLocations;
-
-            return matcher.InstructionEnumeration();
-        }
-
-        _ = Transpiler(null);
-        throw new NotImplementedException("Stub method");
-    }
-
-    private static string MarkSaveDone(string location)
-    {
-        BanksDone++;
-
-        if (BanksDone >= BanksMax)
-        {
-            SaveDone = true;
-        }
-
-        return Path.Combine(location, $"itembank_{BanksDone - 1}");
-    }
-}
-
-[HarmonyPatch(typeof(ProfileDataManager), nameof(ProfileDataManager.Save_ProfileData))]
-static class CharacterAutoSaver
-{
-    public static void TrySaveCurrentProfileToLocation(string location)
-    {
-        if (SaveDone)
-        {
-            AutoSaverMod.Instance.Logger.LogInfo("Triggering character save process...");
-        }
-
-        SaveLocationOverride = location;
-        SaveDone = false;
-        SaveProfileData(ProfileDataManager._current);
-    }
-
-    private static string SaveLocationOverride;
-    private static string TempContents;
-    internal static bool SaveDone { get; private set; } = true;
-
-    [HarmonyReversePatch]
-    private static void SaveProfileData(ProfileDataManager __instance)
-    {
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> data)
-        {
-            var matcher = new CodeMatcher(data);
-
-            // Strategy: everywhere the save is about to be saved, drop the input path and use our own
-
-            int patchLocations = 0;
-
-            while (true)
-            {
-                matcher.MatchForward(false,
-                    new CodeMatch(OpCodes.Call, SymbolExtensions.GetMethodInfo(() => File.WriteAllText(null, null)))
-                    );
-
-                if (matcher.IsInvalid)
-                    break;
-
-                patchLocations++;
-
-                matcher.InsertAndAdvance(
-                    new CodeInstruction(OpCodes.Stsfld, AccessTools.Field(typeof(CharacterAutoSaver), nameof(TempContents))),
-                    new CodeInstruction(OpCodes.Pop),
-                    new CodeInstruction(OpCodes.Ldsfld, AccessTools.Field(typeof(CharacterAutoSaver), nameof(SaveLocationOverride))),
-                    new CodeInstruction(OpCodes.Call, SymbolExtensions.GetMethodInfo(() => MarkSaveDone(null))),
-                    new CodeInstruction(OpCodes.Ldsfld, AccessTools.Field(typeof(CharacterAutoSaver), nameof(TempContents)))
-                    );
-
-                matcher.Advance(1);
-            }
-
-            const int expectedLocations = 3;
-
-            if (patchLocations != expectedLocations)
-            {
-                AutoSaverMod.Instance.Logger.LogWarning($"WARNING: Expected {expectedLocations} patch locations, got {patchLocations}.");
-                AutoSaverMod.Instance.Logger.LogWarning($"The mod might behave incorrectly as a result. You should tell the mod developer about this.");
-            }
-
-            return matcher.InstructionEnumeration();
-        }
-
-        _ = Transpiler(null);
-        throw new NotImplementedException("Stub method");
-    }
-
-    private static string MarkSaveDone(string location)
-    {
-        SaveDone = true;
-        return location;
     }
 }

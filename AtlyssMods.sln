@@ -17,6 +17,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PatchOutThatThingThatBlocks
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AutoSaver", "AutoSaver\AutoSaver.csproj", "{7F94F1D7-4878-4B1A-879B-0C82B5ED8EDA}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WalkMode", "WalkMode\WalkMode.csproj", "{39AC4DF6-4F07-4FDF-8278-2B08B5421A8E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -51,6 +53,10 @@ Global
 		{7F94F1D7-4878-4B1A-879B-0C82B5ED8EDA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7F94F1D7-4878-4B1A-879B-0C82B5ED8EDA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7F94F1D7-4878-4B1A-879B-0C82B5ED8EDA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{39AC4DF6-4F07-4FDF-8278-2B08B5421A8E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{39AC4DF6-4F07-4FDF-8278-2B08B5421A8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{39AC4DF6-4F07-4FDF-8278-2B08B5421A8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{39AC4DF6-4F07-4FDF-8278-2B08B5421A8E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
