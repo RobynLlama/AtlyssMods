@@ -1,5 +1,5 @@
 {
-  "name": "Marioalexsan.AutoSaver",
+  "name": "AutoSaver",
   "description": "Advanced automatic save backups for ATLYSS.",
   "version_number": "1.1.0",
   "dependencies": [

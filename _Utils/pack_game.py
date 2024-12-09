@@ -73,6 +73,14 @@ with open(csprojs[0], 'r') as f:
     print('Failed to find <AssemblyName> to use as mod GUID in .csproj, cannot pack mod as a result.')
     sys.exit(1)
 
+  MATCH_THUNDERSTORENAME = re.search("<ThunderstoreName>(.*)</ThunderstoreName>", CSPROJ_DATA)
+    
+  if MATCH_THUNDERSTORENAME is not None:
+    MOD_THUNDERSTORENAME = MATCH_THUNDERSTORENAME.group(1)
+  else:
+    print('Failed to find <ThunderstoreName> to use as mod name in .csproj, cannot pack mod as a result.')
+    sys.exit(1)
+
   MATCH_VERSION = re.search("<Version>(.*)</Version>", CSPROJ_DATA)
     
   if MATCH_VERSION is not None:
@@ -109,7 +117,7 @@ if not os.path.exists(os.path.join(sys.argv[1], '_Thunderstore', 'manifest.json'
 with open(os.path.join(sys.argv[1], '_Thunderstore', 'manifest.json'), 'r') as f:
   MANIFEST_DATA = json.loads(f.read())
 
-MANIFEST_DATA['name'] = MOD_GUID
+MANIFEST_DATA['name'] = MOD_THUNDERSTORENAME
 MANIFEST_DATA['version_number'] = MOD_VERSION
 
 with open(os.path.join(sys.argv[1], '_Thunderstore', 'manifest.json'), 'w') as f:

@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
     <!-- Generic assembly info. -->
     <PropertyGroup>
         <TargetFramework>netstandard2.1</TargetFramework>
+        <ThunderstoreName>SettingsPlus</ThunderstoreName>
         <AssemblyName>Marioalexsan.SettingsPlus</AssemblyName>
         <RootNamespace>Marioalexsan.SettingsPlus</RootNamespace>
         <Product>SettingsPlus</Product>

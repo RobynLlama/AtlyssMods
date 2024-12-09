@@ -1,5 +1,5 @@
 {
-  "name": "Marioalexsan.AtlyssDiscordRichPresence",
+  "name": "AtlyssDiscordRichPresence",
   "description": "Adds Discord Rich Presence to ATLYSS.",
   "version_number": "1.1.1",
   "dependencies": [

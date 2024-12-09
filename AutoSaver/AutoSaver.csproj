@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
     <!-- Generic assembly info. -->
     <PropertyGroup>
         <TargetFramework>net48</TargetFramework>
+        <ThunderstoreName>AutoSaver</ThunderstoreName>
         <AssemblyName>Marioalexsan.AutoSaver</AssemblyName>
         <RootNamespace>Marioalexsan.AutoSaver</RootNamespace>
         <Product>AutoSaver</Product>

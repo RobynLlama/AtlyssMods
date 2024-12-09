@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
     <!-- Generic assembly info. -->
     <PropertyGroup>
         <TargetFramework>net472</TargetFramework>
+        <ThunderstoreName>AllowAnyNames</ThunderstoreName>
         <AssemblyName>Marioalexsan.AllowAnyNames</AssemblyName>
         <RootNamespace>Marioalexsan.AllowAnyNames</RootNamespace>
         <Product>AllowAnyNames</Product>

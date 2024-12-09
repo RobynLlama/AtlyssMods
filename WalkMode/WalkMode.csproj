@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
     <!-- Generic assembly info. -->
     <PropertyGroup>
         <TargetFramework>net48</TargetFramework>
+        <ThunderstoreName>WalkMode</ThunderstoreName>
         <AssemblyName>Marioalexsan.WalkMode</AssemblyName>
         <RootNamespace>Marioalexsan.WalkMode</RootNamespace>
         <Product>WalkMode</Product>

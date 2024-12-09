@@ -1,6 +1,6 @@
 {
-  "name": "AllowAnyNames",
-  "description": "Removes player name restrictions, allowing usage of color tags and longer names.",
+  "name": "TemplateMod",
+  "description": "Template mod.",
   "version_number": "1.0.0",
   "dependencies": [
     "BepInEx-BepInExPack-5.4.2100"

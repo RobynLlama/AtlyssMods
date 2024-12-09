@@ -1,10 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-    <Import Project="_Utils/InstallPath.props" />
-
     <!-- Generic assembly info. -->
     <PropertyGroup>
-        <TargetFramework>netstandard2.1</TargetFramework>
-        <AssemblyName>TemplateMod</AssemblyName>
+        <TargetFramework>net48</TargetFramework>
+        <ThunderstoreName>TemplateMod</ThunderstoreName>
+        <AssemblyName>Marioalexsan.TemplateMod</AssemblyName>
         <RootNamespace>Marioalexsan.TemplateMod</RootNamespace>
         <Product>TemplateMod</Product>
         <Version>1.0.0</Version>
@@ -53,6 +52,10 @@
             <HintPath>$(ATLYSS_MANAGED)\UnityEngine.dll</HintPath>
             <Private>False</Private>
         </Reference>
+        <Reference Include="UnityEngine.AnimationModule">
+            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.AnimationModule.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
         <Reference Include="UnityEngine.AudioModule">
             <HintPath>$(ATLYSS_MANAGED)\UnityEngine.AudioModule.dll</HintPath>
             <Private>False</Private>
@@ -67,6 +70,18 @@
         </Reference>
         <Reference Include="UnityEngine.UI">
             <HintPath>$(ATLYSS_MANAGED)\UnityEngine.UI.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="UnityEngine.InputModule">
+            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.InputModule.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="UnityEngine.InputLegacyModule">
+            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.InputLegacyModule.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="UnityEngine.PhysicsModule">
+            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.PhysicsModule.dll</HintPath>
             <Private>False</Private>
         </Reference>
     </ItemGroup>
@@ -130,9 +145,9 @@
         </Reference>
     </ItemGroup>    
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-        <Exec Command="python _Utils/pack_game.py" ContinueOnError="true" />
+        <Exec Command="python ../_Utils/pack_game.py $(MSBuildProjectName)/" ContinueOnError="true" />
     </Target>
     <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-        <Exec Command="python _Utils/find_game.py" ContinueOnError="true" />
+        <Exec Command="python ../_Utils/find_game.py" ContinueOnError="true" />
     </Target>
 </Project>
