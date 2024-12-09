@@ -47,7 +47,7 @@ if CHOSEN_PATH is None:
   print("Couldn't determine install path, try manually specifying ATLYSS_PATH in _Utils/InstallPath.props.")
   sys.exit(1)
 
-with open('InstallPath.props', 'r') as f:
+with open('../Directory.Build.props', 'r') as f:
   PROPS_DATA = f.read()
 
 match = re.search("<ATLYSS_PATH>(.*)</ATLYSS_PATH>", PROPS_DATA)
@@ -63,7 +63,8 @@ if not os.path.exists(os.path.join(PREVIOUS_PATH, GAME_EXECUTABLE)):
   print(f"Overriding ATLYSS_PATH value with {CHOSEN_PATH}")
 else:
   print(f"Previous ATLYSS_PATH {PREVIOUS_PATH} seems valid, won't overwrite it.")
-  print(f"The detected path was {CHOSEN_PATH} in case you need it.")
+  if PREVIOUS_PATH != CHOSEN_PATH:
+    print(f"The detected path was {CHOSEN_PATH} in case you need it.")
   sys.exit(0)
   
 
@@ -71,7 +72,7 @@ NEW_PATH = str.replace(fr"<ATLYSS_PATH>{CHOSEN_PATH}</ATLYSS_PATH>", "\\", "\\\\
 
 NEW_PROPS_DATA = re.sub("<ATLYSS_PATH>(.*)</ATLYSS_PATH>", NEW_PATH, PROPS_DATA)
 
-with open('InstallPath.props', 'w') as f:
+with open('../Directory.Build.props', 'w') as f:
   f.write(NEW_PROPS_DATA)
 
 print(f"Set ATLYSS_PATH to {CHOSEN_PATH}")

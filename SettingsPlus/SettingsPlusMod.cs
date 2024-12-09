@@ -20,7 +20,7 @@ public class ModSettingsProfile
     public int _fps = 60;
 }
 
-[BepInPlugin("Marioalexsan.SettingsPlus", "SettingsPlus", "1.0.0")]
+[BepInPlugin(ModInfo.PLUGIN_GUID, ModInfo.PLUGIN_NAME, ModInfo.PLUGIN_VERSION)]
 public class SettingsPlusMod : BaseUnityPlugin
 {
     internal new ManualLogSource Logger;
@@ -41,7 +41,7 @@ public class SettingsPlusMod : BaseUnityPlugin
         FPS = 60;
         VSync = false;
 
-        _harmony = new Harmony("Marioalexsan.SettingsPlus");
+        _harmony = new Harmony(ModInfo.PLUGIN_GUID);
         _harmony.PatchAll();
 
         Logger.LogInfo("Hello from Marioalexsasn.SettingsPlus!");

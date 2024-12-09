@@ -16,10 +16,7 @@ using BepInEx.Configuration;
 
 namespace Marioalexsan.AtlyssDiscordRichPresence;
 
-public class ModAwareMultiplayerVanillaCompatibleAttribute : Attribute { }
-
-[BepInPlugin("Marioalexsan.AtlyssDiscordRichPresence", "AtlyssDiscordRichPresence", "1.1.1")]
-[ModAwareMultiplayerVanillaCompatible]
+[BepInPlugin(ModInfo.PLUGIN_GUID, ModInfo.PLUGIN_NAME, ModInfo.PLUGIN_VERSION)]
 public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
 {
     public static AtlyssDiscordRichPresenceMod Instance { get; private set; }
@@ -81,7 +78,7 @@ public class AtlyssDiscordRichPresenceMod : BaseUnityPlugin
     {
         InitializeConfiguration();
 
-        _harmony = new Harmony("Marioalexsan.AtlyssDiscordRichPresence");
+        _harmony = new Harmony(ModInfo.PLUGIN_GUID);
         _harmony.PatchAll();
 
         Instance = this;

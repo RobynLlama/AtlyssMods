@@ -1,13 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-    <Import Project="_Utils/InstallPath.props" />
 
     <!-- Generic assembly info. -->
     <PropertyGroup>
-        <!-- use "net48" target if you need to work with ILGenerator -->
-        <TargetFramework>net48</TargetFramework>
-        <AssemblyName>PatchOutThatThingThatBlocksModdedAtlyss</AssemblyName>
-        <RootNamespace>Marioalexsan.PatchOutThatThingThatBlocksModdedAtlyss</RootNamespace>
-        <Product>Yeah.</Product>
+        <TargetFramework>net472</TargetFramework>
+        <AssemblyName>Marioalexsan.AllowAnyNames</AssemblyName>
+        <RootNamespace>Marioalexsan.AllowAnyNames</RootNamespace>
+        <Product>AllowAnyNames</Product>
         <Version>1.0.0</Version>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>latest</LangVersion>
@@ -137,9 +135,9 @@
         </Reference>
     </ItemGroup>
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-        <Exec Command="python _Utils/pack_game.py" ContinueOnError="true" />
+        <Exec Command="python ../_Utils/pack_game.py $(MSBuildProjectName)/" ContinueOnError="true" />
     </Target>
     <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-        <Exec Command="python _Utils/find_game.py" ContinueOnError="true" />
+        <Exec Command="python ../_Utils/find_game.py" ContinueOnError="true" />
     </Target>
 </Project>

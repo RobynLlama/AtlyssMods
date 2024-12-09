@@ -11,17 +11,14 @@ using HarmonyLib;
 
 namespace Marioalexsan.NoPlayerCap;
 
-public class ModAwareMultiplayerVanillaCompatibleAttribute : Attribute { }
-
-[BepInPlugin("Marioalexsan.NoPlayerCap", "NoPlayerCap", "1.0.0")]
-[ModAwareMultiplayerVanillaCompatible]
+[BepInPlugin(ModInfo.PLUGIN_GUID, ModInfo.PLUGIN_NAME, ModInfo.PLUGIN_VERSION)]
 public class NoPlayerCapMod : BaseUnityPlugin
 {
     private Harmony _harmony;
 
     private void Awake()
     {
-        _harmony = new Harmony("Marioalexsan.NoPlayerCap");
+        _harmony = new Harmony(ModInfo.PLUGIN_GUID);
         _harmony.PatchAll();
     }
 }

@@ -1,10 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-    <Import Project="_Utils/InstallPath.props" />
 
     <!-- Generic assembly info. -->
     <PropertyGroup>
         <TargetFramework>netstandard2.1</TargetFramework>
-        <AssemblyName>SettingsPlus</AssemblyName>
+        <AssemblyName>Marioalexsan.SettingsPlus</AssemblyName>
         <RootNamespace>Marioalexsan.SettingsPlus</RootNamespace>
         <Product>SettingsPlus</Product>
         <Version>1.0.0</Version>
@@ -130,9 +129,9 @@
         </Reference>
     </ItemGroup>    
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-        <Exec Command="python _Utils/pack_game.py" ContinueOnError="true" />
+        <Exec Command="python ../_Utils/pack_game.py $(MSBuildProjectName)/" ContinueOnError="true" />
     </Target>
     <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-        <Exec Command="python _Utils/find_game.py" ContinueOnError="true" />
+        <Exec Command="python ../_Utils/find_game.py" ContinueOnError="true" />
     </Target>
 </Project>

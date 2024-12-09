@@ -18,7 +18,7 @@ using UnityEngine;
 
 namespace Marioalexsan.WalkMode;
 
-[BepInPlugin("Marioalexsan.WalkMode", "WalkMode", "1.0.0")]
+[BepInPlugin(ModInfo.PLUGIN_GUID, ModInfo.PLUGIN_NAME, ModInfo.PLUGIN_VERSION)]
 public class WalkModeMod : BaseUnityPlugin
 {
     public static WalkModeMod Instance { get; private set; }
@@ -38,7 +38,7 @@ public class WalkModeMod : BaseUnityPlugin
         Logger = base.Logger;
 
         Logger.LogInfo("Patching methods...");
-        _harmony = new Harmony("Marioalexsan.WalkMode");
+        _harmony = new Harmony(ModInfo.PLUGIN_GUID);
         _harmony.PatchAll();
 
         Logger.LogInfo("Configuring...");

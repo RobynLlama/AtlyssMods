@@ -1,10 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-    <Import Project="_Utils/InstallPath.props" />
 
     <!-- Generic assembly info. -->
     <PropertyGroup>
         <TargetFramework>net48</TargetFramework>
-        <AssemblyName>AutoSaver</AssemblyName>
+        <AssemblyName>Marioalexsan.AutoSaver</AssemblyName>
         <RootNamespace>Marioalexsan.AutoSaver</RootNamespace>
         <Product>AutoSaver</Product>
         <Version>1.1.0</Version>
@@ -132,11 +131,11 @@
             <HintPath>$(ATLYSS_BEPINEX)\MonoMod.Utils.dll</HintPath>
             <Private>False</Private>
         </Reference>
-    </ItemGroup>    
+    </ItemGroup>
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-        <Exec Command="python _Utils/pack_game.py" ContinueOnError="true" />
+        <Exec Command="python ../_Utils/pack_game.py $(MSBuildProjectName)/" ContinueOnError="true" />
     </Target>
     <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-        <Exec Command="python _Utils/find_game.py" ContinueOnError="true" />
+        <Exec Command="python ../_Utils/find_game.py" ContinueOnError="true" />
     </Target>
 </Project>

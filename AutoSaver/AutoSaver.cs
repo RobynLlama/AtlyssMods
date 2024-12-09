@@ -22,7 +22,7 @@ using UnityEngine;
 
 namespace Marioalexsan.AutoSaver;
 
-[BepInPlugin("Marioalexsan.AutoSaver", "AutoSaver", "1.1.0")]
+[BepInPlugin(ModInfo.PLUGIN_GUID, ModInfo.PLUGIN_NAME, ModInfo.PLUGIN_VERSION)]
 public class AutoSaverMod : BaseUnityPlugin
 {
     public const string MoreBankTabsIndentifier = "com.16mb.morebanktabs";
@@ -47,7 +47,7 @@ public class AutoSaverMod : BaseUnityPlugin
         Instance = this;
         Logger = base.Logger;
         Logger.LogInfo("AutoSaver patching...");
-        _harmony = new Harmony("Marioalexsan.AutoSaver");
+        _harmony = new Harmony(ModInfo.PLUGIN_GUID);
         _harmony.PatchAll();
 
         Logger.LogInfo("AutoSaver configuring...");

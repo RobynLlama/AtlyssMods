@@ -10,14 +10,14 @@ using HarmonyLib;
 
 namespace Marioalexsan.AllowAnyNames;
 
-[BepInPlugin("Marioalexsan.AllowAnyNames", "AllowAnyNames", "1.0.0")]
+[BepInPlugin(ModInfo.PLUGIN_GUID, ModInfo.PLUGIN_NAME, ModInfo.PLUGIN_VERSION)]
 public class AllowAnyNamesMod : BaseUnityPlugin
 {
     private Harmony _harmony;
 
     private void Awake()
     {
-        _harmony = new Harmony("Marioalexsan.AllowAnyNames");
+        _harmony = new Harmony(ModInfo.PLUGIN_GUID);
         _harmony.PatchAll();
 
         UnityEngine.Debug.Log("Hello from Marioalexsan.AllowAnyNames!");

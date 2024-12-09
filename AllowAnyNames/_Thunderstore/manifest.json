@@ -1,5 +1,5 @@
 {
-  "name": "AllowAnyNames",
+  "name": "Marioalexsan.AllowAnyNames",
   "description": "Removes player name restrictions, allowing usage of color tags and longer names.",
   "version_number": "1.0.0",
   "dependencies": [
