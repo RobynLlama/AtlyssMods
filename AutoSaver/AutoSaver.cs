@@ -1,15 +1,11 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Linq;
-using System.Reflection.Emit;
 using System.Security;
 using System.Security.Permissions;
 using BepInEx;
 using BepInEx.Bootstrap;
-using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using Marioalexsan.AutoSaver.HarmonyReversePatches;
@@ -322,26 +318,5 @@ public class AutoSaverMod : BaseUnityPlugin
             Logger.LogError($"Exception message: {e}");
             return;
         }
-    }
-}
-
-[HarmonyPatch(typeof(Player), nameof(Player.OnPlayerMapInstanceChange))]
-static class Player_OnPlayerMapInstanceChange
-{
-    static void Postfix(Player __instance, MapInstance _new)
-    {
-        if (__instance == Player._mainPlayer && (AutoSaverMod.Instance.SaveOnMapChange || !AutoSaverMod.Instance.CharacterActive))
-        {
-            AutoSaverMod.Instance.GameEntered();
-        }
-    }
-}
-
-[HarmonyPatch(typeof(InGameUI), nameof(InGameUI.Init_DisconnectGame))]
-static class InGameUI_Init_DisconnectGame
-{
-    static void Prefix()
-    {
-        AutoSaverMod.Instance.GameExited();
     }
 }

@@ -2,11 +2,11 @@
     <!-- Generic assembly info. -->
     <PropertyGroup>
         <TargetFramework>net48</TargetFramework>
-        <ThunderstoreName>AutoSaver</ThunderstoreName>
-        <AssemblyName>Marioalexsan.AutoSaver</AssemblyName>
-        <RootNamespace>Marioalexsan.AutoSaver</RootNamespace>
-        <Product>AutoSaver</Product>
-        <Version>1.1.1</Version>
+        <ThunderstoreName>ModAudio</ThunderstoreName>
+        <AssemblyName>Marioalexsan.ModAudio</AssemblyName>
+        <RootNamespace>Marioalexsan.ModAudio</RootNamespace>
+        <Product>ModAudio</Product>
+        <Version>1.0.0</Version>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>latest</LangVersion>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
@@ -23,6 +23,8 @@
     <!-- Publicizer for accessing private identifiers in ATLYSS's assembly. -->
     <ItemGroup>
         <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.2" PrivateAssets="all" />
+        <PackageReference Include="NAudio" Version="2.2.1" />
+        <PackageReference Include="NVorbis" Version="0.10.5" />
     </ItemGroup>
 
     <!-- ATLYSS_Data/Managed assemblies. -->
@@ -52,7 +54,11 @@
             <HintPath>$(ATLYSS_MANAGED)\UnityEngine.dll</HintPath>
             <Private>False</Private>
         </Reference>
-        <Reference Include="UnityEngine.AudioModule">
+        <Reference Include="UnityEngine.AnimationModule">
+            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.AnimationModule.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="UnityEngine.AudioModule" Publicize="true">
             <HintPath>$(ATLYSS_MANAGED)\UnityEngine.AudioModule.dll</HintPath>
             <Private>False</Private>
         </Reference>
@@ -68,8 +74,20 @@
             <HintPath>$(ATLYSS_MANAGED)\UnityEngine.UI.dll</HintPath>
             <Private>False</Private>
         </Reference>
+        <Reference Include="UnityEngine.InputModule">
+            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.InputModule.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
         <Reference Include="UnityEngine.InputLegacyModule">
             <HintPath>$(ATLYSS_MANAGED)\UnityEngine.InputLegacyModule.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="UnityEngine.PhysicsModule">
+            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.PhysicsModule.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="UnityEngine.AssetBundleModule">
+            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.AssetBundleModule.dll</HintPath>
             <Private>False</Private>
         </Reference>
     </ItemGroup>
@@ -132,6 +150,9 @@
             <Private>False</Private>
         </Reference>
     </ItemGroup>
+    <ItemGroup>
+      <Folder Include="Utils\" />
+    </ItemGroup>    
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
         <Exec Command="python ../_Utils/pack_game.py $(MSBuildProjectName)/" ContinueOnError="true" />
     </Target>
