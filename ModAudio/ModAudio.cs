@@ -35,6 +35,8 @@ public class ModAudio : BaseUnityPlugin
     private string AudioReference => Path.Combine(AudioLocation, "__README.txt");
     private string AudioRoutes => Path.Combine(AudioLocation, "__routes.txt");
 
+    public bool DetailedLogging { get; private set; }
+
     public void LoadModAudio(BaseUnityPlugin plugin, string audioFolder = null)
     {
         if (plugin == this)
@@ -83,6 +85,9 @@ public class ModAudio : BaseUnityPlugin
     {
         if (Resolve(input.clip, out var destination))
         {
+            if (DetailedLogging)
+                Logger.LogInfo($"Rerouted {input.clip.name} => {destination.name}.");
+
             if (!_originalSources.TryGetValue(input, out _))
                 _originalSources.Add(input, new WeakReference<AudioClip>(input.clip));
 
@@ -139,9 +144,16 @@ public class ModAudio : BaseUnityPlugin
         Directory.CreateDirectory(AudioLocation);
 
         if (!File.Exists(AudioRoutes))
-            File.Create(AudioRoutes);
+        {
+            using var stream = File.Create(AudioRoutes);
+        }
+
+        DetailedLogging = Config.Bind("General", "ExtensiveLogging", false, "Set to true to enable detailed audio logging. Might be resource intensive / spammy").Value;
 
         VanillaClipNames.GenerateReferenceFile(AudioReference);
+
+        //if (DetailedLogging)
+        //    VanillaClipNames.GenerateReferenceFile2(AudioReference);
 
         Logger.LogInfo("Loading custom audio...");
         LoadAudio(this, AudioLocation);
@@ -151,14 +163,22 @@ public class ModAudio : BaseUnityPlugin
 
     private void SceneManager_sceneLoaded(Scene arg0, LoadSceneMode arg1)
     {
-        StartCoroutine(CheckNewScene());
+        StartCoroutine(CheckNewScene(arg0));
     }
 
-    System.Collections.IEnumerator CheckNewScene()
+    System.Collections.IEnumerator CheckNewScene(Scene arg0)
     {
-        yield return null; // A frame delay should allow all objects to actually load in
+        yield return null; // A frame delay should allow all objects to actually load in (?)
 
-        foreach (var audio in FindObjectsOfType<AudioSource>())
+        if (DetailedLogging)
+            Logger.LogInfo("Checking new scene for audio sources...");
+
+        foreach (var audio in FindObjectsOfType<AudioSource>(true))
+        {
+            if (DetailedLogging)
+                Logger.LogInfo($"  {audio.name} - {audio.clip?.name ?? "<No clip>"}");
+
             Reroute(audio);
+        }
     }
 }

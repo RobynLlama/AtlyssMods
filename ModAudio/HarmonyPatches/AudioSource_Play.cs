@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using Mono.Cecil;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,6 +7,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Windows;
 
 namespace Marioalexsan.ModAudio.HarmonyPatches;
 
@@ -14,7 +16,9 @@ static class AudioSource_PlayHelper
 {
     static void Prefix(AudioSource source)
     {
-        //Debug.Log("PlayHelper " + source?.name + " " + source?.clip?.name);
+        if (ModAudio.Instance.DetailedLogging)
+            ModAudio.Instance.Logger.LogInfo($"PlayHelper {source?.name} | {source?.clip?.name}");
+
         ModAudio.Instance.Reroute(source);
     }
 }
@@ -24,7 +28,9 @@ static class AudioSource_Play
 {
     static void Prefix(AudioSource __instance)
     {
-        //Debug.Log("Play " + __instance?.name + " " + __instance?.clip?.name);
+        if (ModAudio.Instance.DetailedLogging)
+            ModAudio.Instance.Logger.LogInfo($"Play {__instance?.name} | {__instance?.clip?.name}");
+
         ModAudio.Instance.Reroute(__instance);
     }
 }
@@ -34,7 +40,9 @@ static class AudioSource_PlayOneShotHelper
 {
     static void Prefix(AudioSource source)
     {
-        //Debug.Log("PlayOneShotHelper " + source?.name + " " + source?.clip?.name);
+        if (ModAudio.Instance.DetailedLogging)
+            ModAudio.Instance.Logger.LogInfo($"PlayOneShotHelper {source?.name} | {source?.clip?.name}");
+
         ModAudio.Instance.Reroute(source);
     }
 }

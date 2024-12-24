@@ -24,7 +24,7 @@ if False:
     f.writelines([x + ' = ' + y + os.linesep for x, y in pairs])
 else:
   with open('data.json', 'w') as f:
-    f.write('public static class Clips' + os.linesep)
-    f.write('{'  + os.linesep)
-    f.writelines(['    public static readonly string ' + x + ' = \"' + y + '\";' + os.linesep for x, y in pairs])
-    f.write('}'  + os.linesep)
+    f.write('public static class Clips\n')
+    f.write('{\n')
+    f.writelines(['    public static readonly string ' + x + ' = \"' + y + '\";\n' for x, y in pairs])
+    f.write('}\n')

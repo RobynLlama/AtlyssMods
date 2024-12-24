@@ -1,9 +1,10 @@
 {
   "name": "PowHitsounds",
-  "description": "Template mod.",
-  "version_number": "1.0.0",
+  "description": "Replaces hitsounds with Heavy Weapons Guy's \"POW!\" sound bite.",
+  "version_number": "1.0.1",
   "dependencies": [
-    "BepInEx-BepInExPack-5.4.2100"
+    "BepInEx-BepInExPack-5.4.2100",
+    "Marioalexsan-ModAudio-1.0.1"
   ],
   "website_url": "https://github.com/Marioalexsan/AtlyssMods"
 }
