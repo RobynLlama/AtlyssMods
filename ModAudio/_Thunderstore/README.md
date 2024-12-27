@@ -38,7 +38,19 @@ This can be useful to avoid duplication and to keep meaningful names for your cu
 
 # Audio Pack Mods
 
-You can specify custom audio via mods that depend on ModAudio. Here's an example plugin that does that:
+You can specify custom audio via mods that depend on ModAudio. 
+
+## Mods without plugins
+
+You can make mods without plugins (i.e. a DLL). This requires you to add your assets under the `audio` folder (i.e. `BepInEx/plugins/Your-Mod-Id/audio/`). ModAudio will try to detect audio in that folder and load it automatically.
+
+You can also put your assets directly in the mod's root folder if you want to (i.e. `BepInEx/plugins/Your-Mod-Id/`). **However**, you have to have a `__routes.txt` file present in this case (even if it's empty).
+
+## Mods with plugins
+
+When making mods that have a plugin, you specify the audio to load by using the `LoadModAudio` method.
+
+Here's an example plugin that loads audio from a folder at runtime:
 
 ```cs
 [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
@@ -69,6 +81,8 @@ public class MyCustomAudio : BaseUnityPlugin
     }
 }
 ```
+
+This allows you to be more flexible with where you put your assets if you need that.
 
 # Mod Compatibility
 

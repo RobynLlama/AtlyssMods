@@ -38,11 +38,14 @@ static class AudioSource_Play
 [HarmonyPatch(typeof(AudioSource), nameof(AudioSource.PlayOneShotHelper))]
 static class AudioSource_PlayOneShotHelper
 {
-    static void Prefix(AudioSource source)
+    static void Prefix(AudioSource source, ref AudioClip clip)
     {
         if (ModAudio.Instance.DetailedLogging)
-            ModAudio.Instance.Logger.LogInfo($"PlayOneShotHelper {source?.name} | {source?.clip?.name}");
+            ModAudio.Instance.Logger.LogInfo($"PlayOneShotHelper {source?.name} | {clip?.name}");
 
-        ModAudio.Instance.Reroute(source);
+        if (ModAudio.Instance.Resolve(clip, out var destination))
+        {
+            clip = destination;
+        }
     }
 }
