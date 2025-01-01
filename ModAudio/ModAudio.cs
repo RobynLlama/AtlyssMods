@@ -21,6 +21,11 @@ namespace Marioalexsan.ModAudio;
 [BepInPlugin(ModInfo.PLUGIN_GUID, ModInfo.PLUGIN_NAME, ModInfo.PLUGIN_VERSION)]
 public class ModAudio : BaseUnityPlugin
 {
+    private const float MinWeight = 0.001f;
+    private const float MaxWeight = 1000f;
+    internal const float DefaultWeight = 1f;
+    private const string DefaultClipIdentifier = "___default___";
+
     private static readonly string[] AudioExtensions = [
         ".aiff",
         ".aif",
@@ -35,23 +40,22 @@ public class ModAudio : BaseUnityPlugin
     internal new ManualLogSource Logger { get; private set; }
 
     private Harmony _harmony;
-    private ConditionalWeakTable<AudioSource, WeakReference<AudioClip>> _originalSources = new();
+    private readonly ConditionalWeakTable<AudioSource, WeakReference<AudioClip>> _originalSources = new();
 
     private bool _ranAssetModsDetection;
-    //private GameObject _debugDisplay;
-
     private List<string> _modFoldersChecked = [];
+    private readonly List<(AudioClip, float)> _staticWeights = new List<(AudioClip, float)>(256); // Reuse to reduce amount of garbage generated
+    private readonly System.Random _randomSource = new();
 
     private readonly Dictionary<string, Dictionary<string, AudioClip>> _customAudio = [];
-    private readonly Dictionary<string, Dictionary<string, string>> _customRoutes = [];
+    private readonly Dictionary<string, RouteConfig> _customRoutes = [];
 
     private string AudioLocation => Path.Combine(Path.GetDirectoryName(Info.Location), "audio");
     private string AudioReference => Path.Combine(AudioLocation, "__README.txt");
     private string AudioRoutes => Path.Combine(AudioLocation, "__routes.txt");
 
     public bool DetailedLogging { get; private set; }
-    //public KeyCode DebugKeybind { get; private set; }
-    //public bool DebugDisplayActive { get; private set; }
+    public bool OverrideCustomAudio { get; private set; }
 
     private void Awake()
     {
@@ -71,8 +75,7 @@ public class ModAudio : BaseUnityPlugin
         }
 
         DetailedLogging = Config.Bind("General", "ExtensiveLogging", false, "Set to true to enable detailed audio logging. Might be resource intensive / spammy").Value;
-        //DebugKeybind = Config.Bind("General", "DebugKeybind", KeyCode.Keypad0, "Keybinding used to toggle the debug display for audio.").Value;
-        //_debugDisplay = DebugDisplay.Create();
+        OverrideCustomAudio = Config.Bind("General", "OverrideCustomAudio", false, "Set to true to have ModAudio's audio clips override any custom audio from other mods. If false, it will get mixed in with other mods instead.").Value;
 
         VanillaClipNames.GenerateReferenceFile(AudioReference);
 
@@ -88,21 +91,25 @@ public class ModAudio : BaseUnityPlugin
         {
             foreach (var folder in Directory.GetDirectories(Paths.PluginPath))
             {
-                var routes = Path.Combine(folder, "__routes.txt");
+                // Load stuff from root folder if there are known clip names in it, or a __routes.txt file
+                var rootRoutes = Path.Combine(folder, "__routes.txt");
+                var rootFolder = Path.GetDirectoryName(rootRoutes);
 
-                if (_modFoldersChecked.Contains(Path.GetDirectoryName(routes)))
-                    continue;  // Already added via API
+                if (!_modFoldersChecked.Contains(Path.GetDirectoryName(rootRoutes)))
+                {
+                    if (File.Exists(rootRoutes) || Directory.GetFiles(rootFolder).Any(x => VanillaClipNames.IsKnownClip(Path.GetFileNameWithoutExtension(x))))
+                        LoadAudioFromLocation(rootFolder, "ModAudio:path//" + rootRoutes);
+                }
 
-                if (File.Exists(routes))
-                    LoadAudioFromLocation(Path.GetDirectoryName(routes), "ModAudio:path//" + routes);
+                // Add stuff from the audio folder if it exists
+                var audioRoutes = Path.Combine(folder, "audio", "__routes.txt");
+                var audioFolder = Path.GetDirectoryName(audioRoutes);
 
-                var audio = Path.Combine(folder, "audio", "__routes.txt");
-
-                if (_modFoldersChecked.Contains(Path.GetDirectoryName(audio)))
-                    continue;  // Already added via API
-
-                if (Directory.Exists(Path.GetDirectoryName(audio)))
-                    LoadAudioFromLocation(Path.GetDirectoryName(audio), "ModAudio:path//" + audio);
+                if (!_modFoldersChecked.Contains(audioFolder))
+                {
+                    if (Directory.Exists(audioFolder))
+                        LoadAudioFromLocation(audioFolder, "ModAudio:path//" + audioRoutes);
+                }
             }
         }
         catch (Exception e)
@@ -152,11 +159,14 @@ public class ModAudio : BaseUnityPlugin
 
     private void LoadAudioFromLocation(string audioFolder, string id)
     {
+        bool usedPath = id.StartsWith("ModAudio:path//");
+        string idClean = id.Replace("ModAudio:path//", "").Replace(Paths.PluginPath, "");
+
         if (!_customAudio.TryGetValue(id, out var audio))
             audio = _customAudio[id] = [];
 
         if (!_customRoutes.TryGetValue(id, out var routes))
-            routes = _customRoutes[id] = [];
+            routes = _customRoutes[id] = new();
 
         foreach (var file in Directory.GetFiles(audioFolder))
         {
@@ -187,40 +197,66 @@ public class ModAudio : BaseUnityPlugin
 
         if (File.Exists(routesPath))
         {
-            var data = RouteConfig.Read(routesPath);
+            routes = _customRoutes[id] = RouteConfig.ReadTextFormat(routesPath);
 
-            foreach (var kvp in data)
-                routes.Add(kvp.Key, kvp.Value);
+            foreach (var replacements in routes.ReplacedClips)
+            {
+                foreach (var replacement in replacements.Value)
+                {
+                    var randomWeight = replacement.RandomWeight;
+
+                    if (randomWeight < MinWeight)
+                    {
+                        Logger.LogWarning($"Weight {randomWeight} for {replacements.Value} => {replacement.Name} in {(usedPath ? "path" : "mod")} {id} is too low and was capped to {MinWeight}.");
+                        randomWeight = MinWeight;
+                    }
+
+                    if (randomWeight > MaxWeight)
+                    {
+                        Logger.LogWarning($"Weight {randomWeight} for {replacements.Value} => {replacement.Name} {(usedPath ? "path" : "mod")} {id} is too high and was capped to {MaxWeight}.");
+                        randomWeight = MaxWeight;
+                    }
+
+                    replacement.RandomWeight = randomWeight;
+                }
+            }
         }
 
         _modFoldersChecked.Add(Path.GetDirectoryName(routesPath));
 
-        if (audio.Count == 0 && routes.Count == 0)
+        if (audio.Count == 0 && routes.IsEmpty())
         {
             _customAudio.Remove(id);
             _customRoutes.Remove(id);
         }
         else
         {
-            bool usedPath = id.StartsWith("ModAudio:path//");
-            string idClean = id.Replace("ModAudio:path//", "");
-
-            Logger.LogInfo($"Loaded audio from {(usedPath ? "path" : "mod")} {id} ({audio.Count} clips, {routes.Count} routes).");
+            Logger.LogInfo($"Loaded audio from {(usedPath ? "path" : "mod")} {idClean} ({audio.Count} clips, {routes.ReplacedClips.Count} routes, {routes.ReplacedClips.Select(x => x.Value).Sum(x => x.Count)} replacements).");
         }
     }
 
     public void Reroute(AudioSource input)
     {
-        if (Resolve(input.clip, out var destination))
-        {
-            if (input.name == destination.name)
-                return; // No point, same clip
+        var originalClip = input.clip;
 
+        if (_originalSources.TryGetValue(input, out var reference))
+        {
+            if (!reference.TryGetTarget(out originalClip))
+            {
+                _originalSources.Remove(input);
+            }
+        }
+
+        if (Resolve(originalClip, out var destination))
+        {
             if (DetailedLogging)
-                Logger.LogInfo($"Rerouted \"{input.clip.name}\" => \"{destination.name}\"");
+                Logger.LogInfo($"Rerouted \"{originalClip.name}\" => \"{destination.name}\"");
+
+            if (input.clip.name == destination.name)
+                return; // Same clip in audio source at the moment, don't need to do operations on it
 
             if (!_originalSources.TryGetValue(input, out _))
-                _originalSources.Add(input, new WeakReference<AudioClip>(input.clip));
+                _originalSources.Add(input, new WeakReference<AudioClip>(originalClip)); // Save the original clip if this is the first time we route it
 
             // AudioSource needs to be restarted for the new clip to be applied
             var wasPlaying = input.isPlaying;
@@ -241,29 +277,73 @@ public class ModAudio : BaseUnityPlugin
             return false;
         }
 
+        // Clear just in case there's leftover garbage
+        _staticWeights.Clear();
+
         if (_customAudio.ContainsKey(ModInfo.PLUGIN_GUID))
         {
-            if (_customAudio[ModInfo.PLUGIN_GUID].TryGetValue(source.name, out destination))
-                return true;
-
-            if (_customRoutes[ModInfo.PLUGIN_GUID].TryGetValue(source.name, out var routed) && _customAudio[ModInfo.PLUGIN_GUID].TryGetValue(routed, out destination))
-                return true;
+            AddModWeights(source, ModInfo.PLUGIN_GUID);
         }
 
-        foreach (var guid in _customAudio.Keys)
+        if (!(OverrideCustomAudio && _staticWeights.Count > 0))
         {
-            if (guid == ModInfo.PLUGIN_GUID)
-                continue;
+            foreach (var guid in _customAudio.Keys)
+            {
+                if (guid == ModInfo.PLUGIN_GUID)
+                    continue;
 
-            if (_customAudio[guid].TryGetValue(source.name, out destination))
-                return true;
-
-            if (_customRoutes[guid].TryGetValue(source.name, out var routed) && _customAudio[guid].TryGetValue(routed, out destination))
-                return true;
+                AddModWeights(source, guid);
+            }
         }
 
-        destination = null;
-        return false;
+        if (_staticWeights.Count == 0)
+        {
+            destination = null;
+            return false;
+        }
+
+        float totalWeight = _staticWeights.Sum(x => x.Item2);
+        float randomValue = (float)(_randomSource.NextDouble() * totalWeight);
+
+        int index = 0;
+        AudioClip selectedClip = source; // Use source as default if rolling doesn't succeed for some reason
+
+        while (randomValue > 0 && index < _staticWeights.Count)
+        {
+            selectedClip = _staticWeights[index].Item1;
+            randomValue -= _staticWeights[index].Item2;
+            index++;
+        }
+
+        // Clear to remove references
+        _staticWeights.Clear();
+        destination = selectedClip;
+        return true;
+    }
+
+    private void AddModWeights(AudioClip source, string id)
+    {
+        if (_customAudio[id].TryGetValue(source.name, out var destination))
+        {
+            _staticWeights.Add((destination, DefaultWeight));
+        }
+
+        if (_customRoutes[id].ReplacedClips.TryGetValue(source.name, out var replacements))
+        {
+            foreach (var replacement in replacements)
+            {
+                if (replacement.Name == DefaultClipIdentifier)
+                {
+                    // Special case to allow playing the default audio with a chance
+                    _staticWeights.Add((source, replacement.RandomWeight));
+                }
+
+                else if (_customAudio[id].TryGetValue(replacement.Name, out destination))
+                {
+                    _staticWeights.Add((destination, replacement.RandomWeight));
+                }
+            }
+        }
     }
 
     private void SceneManager_sceneLoaded(Scene arg0, LoadSceneMode arg1)

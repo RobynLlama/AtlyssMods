@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-Jan-01
+
+### Added
+
+- You can now specify multiple audio files per source clip in __routes.txt. ModAudio will play one at random, based on their weights.
+- Each clip in __routes.txt can now specify a weight using the format `source = replacement / weight` (where weight is a decimal number, i.e. `1.0`). This is used for random rolls when there are multiple clips present.
+- You can now use the `___default___` identifier when replacing audio. This allows you to include the vanilla audio as a clip that should be played randomly.
+- Added an `OverrideCustomAudio` option that can be used to override any custom audio from mods with whatever you specify in ModAudio itself.
+- `__routes.txt` now supports line comments. Lines starting with `#` will be treated as a comment and ignored.
+
+## [1.0.4] - 2024-Dec-28
+
+### Changed
+
+- Improved audio loading from root folder, it will now also load audio from root if there's at least one clip with a known vanilla name
+
 ## [1.0.3] - 2024-Dec-27
 
 ### Changed

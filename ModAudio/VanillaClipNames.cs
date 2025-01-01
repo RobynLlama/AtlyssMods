@@ -9,16 +9,28 @@ namespace Marioalexsan.ModAudio;
 
 public static class VanillaClipNames
 {
-    internal static void GenerateReferenceFile(string location)
+    private static readonly string[] AllClipNames;
+    private static readonly HashSet<string> ClipNamesHashed;
+
+    static VanillaClipNames()
     {
-        var lines = typeof(VanillaClipNames)
+        AllClipNames = typeof(VanillaClipNames)
             .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
             .Where(x => x.FieldType == typeof(string))
             .OrderBy(x => x.Name)
+            .Select(x => (string)x.GetRawConstantValue())
+            .ToArray();
+
+        ClipNamesHashed = new HashSet<string>(AllClipNames);
+    }
+
+    internal static void GenerateReferenceFile(string location)
+    {
+        var lines = AllClipNames
             .Select(x =>
             {
-                var meta = GetMetadata(x.Name);
-                return (string)x.GetRawConstantValue() + " | " + Enum.GetName(typeof(AudioGroup), meta.AudioGroup) + " | " + meta.Description;
+                var meta = GetMetadata(x);
+                return x + " | " + Enum.GetName(typeof(AudioGroup), meta.AudioGroup) + " | " + meta.Description;
             });
 
         var fileData = string.Join(Environment.NewLine,
@@ -26,10 +38,17 @@ public static class VanillaClipNames
             "To replace an audio clip, put custom audio under assets with the same name as the clip in here.",
             "The extension used (.mp3, .wav, .ogg) doesn't matter.",
             "",
+            "Clip Name | Audio Group | Description",
+            "",
             string.Join(Environment.NewLine, lines)
             );
 
         File.WriteAllText(location, fileData);
+    }
+
+    public static bool IsKnownClip(string clipName)
+    {
+        return ClipNamesHashed.Contains(clipName);
     }
 
     private struct Metadata(AudioGroup audioGroup, string description)
@@ -40,7 +59,7 @@ public static class VanillaClipNames
 
     private enum AudioGroup
     {
-        UNKNOWN,
+        Unknown,
         Ambience,
         Game,
         GUI,
@@ -53,7 +72,7 @@ public static class VanillaClipNames
     {
         return audio switch
         {
-            _ => new(AudioGroup.UNKNOWN, "<unknown>")
+            _ => new(AudioGroup.Unknown, "<not documented yet>")
         };
     }
 
