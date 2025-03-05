@@ -16,19 +16,10 @@ public class RouteClipReplacement
 
 public class RouteConfig
 {
-    // Data
+    private static readonly char[] KeyValueSeparator = ['='];
+    private static readonly char[] ValueFieldSeparator = ['/'];
 
     public Dictionary<string, List<RouteClipReplacement>> ReplacedClips { get; set; } = [];
-
-    public bool IsEmpty()
-    {
-        return ReplacedClips.Count == 0;
-    }
-
-    // Read methods
-
-    private static readonly char[] TextKeyValueSeparator = ['='];
-    private static readonly char[] ValueFieldSeparator = ['/'];
 
     public static RouteConfig ReadTextFormat(string path)
     {
@@ -45,11 +36,11 @@ public class RouteConfig
             if (line.TrimStart().StartsWith("#"))
                 continue; // Comments
 
-            var parts = line.Split(TextKeyValueSeparator, 3);
+            var parts = line.Split(KeyValueSeparator, 3);
 
             if (parts.Length != 2)
             {
-                ModAudio.Instance?.Logger?.LogWarning($"Encountered a malformed route (expected key = value), skipping it.");
+                ModAudio.Plugin?.Logger?.LogWarning($"Encountered a malformed route (expected key = value), skipping it.");
                 continue;
             }
 
@@ -57,7 +48,7 @@ public class RouteConfig
 
             if (fields.Length > 2)
             {
-                ModAudio.Instance?.Logger?.LogWarning($"Too many values defined for a route (expected at most 2), skipping it.");
+                ModAudio.Plugin?.Logger?.LogWarning($"Too many values defined for a route (expected at most 2), skipping it.");
                 continue;
             }
 
@@ -67,7 +58,7 @@ public class RouteConfig
 
             if (clipName.Trim() == "" || replacementName.Trim() == "")
             {
-                ModAudio.Instance?.Logger?.LogWarning($"Either clip name or replacement was empty for a route, skipping it.");
+                ModAudio.Plugin?.Logger?.LogWarning($"Either clip name or replacement was empty for a route, skipping it.");
                 continue;
             }
 
@@ -75,7 +66,7 @@ public class RouteConfig
             {
                 if (!float.TryParse(fields[1], out randomWeight))
                 {
-                    ModAudio.Instance?.Logger?.LogWarning($"Couldn't parse random weight {fields[1]} for {clipName} => {replacementName}, defaulting to {ModAudio.DefaultWeight}.");
+                    ModAudio.Plugin?.Logger?.LogWarning($"Couldn't parse random weight {fields[1]} for {clipName} => {replacementName}, defaulting to {ModAudio.DefaultWeight}.");
                 }
             }
 

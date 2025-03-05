@@ -1,369 +1,186 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Security;
-using System.Security.Permissions;
+﻿using System.Runtime.CompilerServices;
 using BepInEx;
+using BepInEx.Bootstrap;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
+using Marioalexsan.ModAudio.SoftDependencies;
+using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-
-#pragma warning disable CS0618
-
-[module: UnverifiableCode]
-[assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification = true)]
 
 namespace Marioalexsan.ModAudio;
 
 [BepInPlugin(ModInfo.PLUGIN_GUID, ModInfo.PLUGIN_NAME, ModInfo.PLUGIN_VERSION)]
+[BepInDependency(EasySettings.ModID, BepInDependency.DependencyFlags.SoftDependency)]
 public class ModAudio : BaseUnityPlugin
 {
-    private const float MinWeight = 0.001f;
-    private const float MaxWeight = 1000f;
-    internal const float DefaultWeight = 1f;
-    private const string DefaultClipIdentifier = "___default___";
+    public static ModAudio Plugin { get; private set; }
 
-    private static readonly string[] AudioExtensions = [
-        ".aiff",
-        ".aif",
-        ".mp3",
-        ".ogg",
-        ".wav",
-        ".aac",
-        ".alac"
-    ];
+    public const float MinWeight = 0.001f;
+    public const float MaxWeight = 1000f;
+    public const float DefaultWeight = 1f;
+    public const string DefaultClipIdentifier = "___default___";
 
-    public static ModAudio Instance { get; private set; }
     internal new ManualLogSource Logger { get; private set; }
 
     private Harmony _harmony;
-    private readonly ConditionalWeakTable<AudioSource, WeakReference<AudioClip>> _originalSources = new();
 
-    private bool _ranAssetModsDetection;
-    private List<string> _modFoldersChecked = [];
-    private readonly List<(AudioClip, float)> _staticWeights = new List<(AudioClip, float)>(256); // Reuse to reduce amount of garbage generated
-    private readonly System.Random _randomSource = new();
+    private bool _reloadRequired = true;
 
-    private readonly Dictionary<string, Dictionary<string, AudioClip>> _customAudio = [];
-    private readonly Dictionary<string, RouteConfig> _customRoutes = [];
+    public string ModAudioConfigFolder => Path.Combine(Paths.ConfigPath, $"{ModInfo.PLUGIN_GUID}_UserAudioPack");
+    public string ModAudioPluginFolder => Path.GetDirectoryName(Info.Location);
 
-    private string AudioLocation => Path.Combine(Path.GetDirectoryName(Info.Location), "audio");
-    private string AudioReference => Path.Combine(AudioLocation, "__README.txt");
-    private string AudioRoutes => Path.Combine(AudioLocation, "__routes.txt");
+    private void SetupBaseAudioPack()
+    {
+        if (!Directory.Exists(ModAudioConfigFolder))
+            Directory.CreateDirectory(ModAudioConfigFolder);
 
-    public bool DetailedLogging { get; private set; }
-    public bool OverrideCustomAudio { get; private set; }
+        var modConfigPath = Path.Combine(ModAudioConfigFolder, AudioPackLoader.AudioPackConfigName);
+        var routesPath = Path.Combine(ModAudioConfigFolder, AudioPackLoader.RoutesConfigName);
+
+        if (!File.Exists(modConfigPath) && !File.Exists(routesPath))
+        {
+            var modConfig = new AudioPackConfig
+            {
+                UniqueId = ModInfo.PLUGIN_GUID,
+                DisplayName = ModInfo.PLUGIN_NAME,
+            };
+
+            File.WriteAllText(modConfigPath, JsonConvert.SerializeObject(modConfig));
+            VanillaClipNames.GenerateReferenceFile(Path.Combine(ModAudioConfigFolder, "clip_names.txt"));
+        }
+    }
 
     private void Awake()
     {
-        Instance = this;
+        Plugin = this;
         Logger = base.Logger;
 
-        Logger.LogInfo("Patching methods...");
-        _harmony = new Harmony(ModInfo.PLUGIN_GUID);
-        _harmony.PatchAll();
+        _harmony = Harmony.CreateAndPatchAll(typeof(ModAudio).Assembly, ModInfo.PLUGIN_GUID);
 
         SceneManager.sceneLoaded += SceneManager_sceneLoaded;
-        Directory.CreateDirectory(AudioLocation);
 
-        if (!File.Exists(AudioRoutes))
-        {
-            using var stream = File.Create(AudioRoutes);
-        }
-
-        DetailedLogging = Config.Bind("General", "ExtensiveLogging", false, "Set to true to enable detailed audio logging. Might be resource intensive / spammy").Value;
-        OverrideCustomAudio = Config.Bind("General", "OverrideCustomAudio", false, "Set to true to have ModAudio's audio clips override any custom audio from other mods. If false, it will get mixed in with other mods instead.").Value;
-
-        VanillaClipNames.GenerateReferenceFile(AudioReference);
-
-        Logger.LogInfo("Loading custom audio...");
-        LoadAudio(this, AudioLocation);
+        SetupBaseAudioPack();
+        InitializeConfiguration();
 
         Logger.LogInfo("Initialized successfully!");
     }
 
-    private void DetectAssetMods()
-    {
-        try
-        {
-            foreach (var folder in Directory.GetDirectories(Paths.PluginPath))
-            {
-                // Load stuff from root folder if there are known clip names in it, or a __routes.txt file
-                var rootRoutes = Path.Combine(folder, "__routes.txt");
-                var rootFolder = Path.GetDirectoryName(rootRoutes);
+    public ConfigEntry<bool> VerboseLoading { get; private set; }
+    public ConfigEntry<bool> VerboseReplacements { get; private set; }
+    public ConfigEntry<bool> OverrideCustomAudio { get; private set; }
 
-                if (!_modFoldersChecked.Contains(Path.GetDirectoryName(rootRoutes)))
+    public Dictionary<string, ConfigEntry<bool>> AudioPackEnabled { get; } = [];
+
+    private void InitializeConfiguration()
+    {
+        VerboseLoading = Config.Bind("Logging", nameof(VerboseLoading), false, Texts.VerboseLoadingDescription);
+        VerboseReplacements = Config.Bind("Logging", nameof(VerboseReplacements), false, Texts.VerboseRoutingDescription);
+        OverrideCustomAudio = Config.Bind("Logging", nameof(OverrideCustomAudio), false, Texts.OverrideCustomAudioDescription);
+
+        if (EasySettings.IsAvailable)
+        {
+            EasySettings.OnApplySettings.AddListener(() =>
+            {
+                Config.Save();
+
+                foreach (var pack in AudioEngine.AudioPacks)
                 {
-                    if (File.Exists(rootRoutes) || Directory.GetFiles(rootFolder).Any(x => VanillaClipNames.IsKnownClip(Path.GetFileNameWithoutExtension(x))))
-                        LoadAudioFromLocation(rootFolder, "ModAudio:path//" + rootRoutes);
+                    pack.Enabled = !AudioPackEnabled.TryGetValue(pack.Config.UniqueId, out var config) || config.Value;
+                    Logger.LogInfo($"Pack {pack.Config.UniqueId} is now {pack.Enabled}");
                 }
 
-                // Add stuff from the audio folder if it exists
-                var audioRoutes = Path.Combine(folder, "audio", "__routes.txt");
-                var audioFolder = Path.GetDirectoryName(audioRoutes);
+                AudioEngine.SoftReload();
+            });
+            EasySettings.OnInitialized.AddListener(() =>
+            {
+                EasySettings.AddHeader(ModInfo.PLUGIN_NAME);
+                EasySettings.AddToggle(Texts.VerboseReplacemensTitle, VerboseReplacements);
+                EasySettings.AddToggle(Texts.VerboseLoadingTitle, VerboseLoading);
+                EasySettings.AddToggle(Texts.OverrideCustomAudioTitle, OverrideCustomAudio);
+            });
+        }
+    }
 
-                if (!_modFoldersChecked.Contains(audioFolder))
+    private void InitializePackConfiguration()
+    {
+        if (EasySettings.IsAvailable)
+        {
+            EasySettings.AddHeader($"{ModInfo.PLUGIN_NAME} audio packs");
+            EasySettings.AddButton(Texts.ReloadTitle, () => _reloadRequired = true);
+
+            foreach (var pack in AudioEngine.AudioPacks)
+            {
+                if (!AudioPackEnabled.ContainsKey(pack.Config.UniqueId))
                 {
-                    if (Directory.Exists(audioFolder))
-                        LoadAudioFromLocation(audioFolder, "ModAudio:path//" + audioRoutes);
+                    var enabled = Config.Bind("EnabledAudioPacks", pack.Config.UniqueId, true, Texts.EnablePackDescription(pack.Config.DisplayName));
+
+                    AudioPackEnabled[pack.Config.UniqueId] = enabled;
+                    EasySettings.AddToggle(pack.Config.DisplayName, enabled);
+                    pack.Enabled = enabled.Value;
                 }
             }
         }
-        catch (Exception e)
-        {
-            Logger.LogWarning("Exception occurred while trying to detect asset mods.");
-            Logger.LogWarning(e);
+    }
 
+    private void CheckForObsoleteStuff()
+    {
+        static bool IsAudioPackFile(string name)
+        {
+            return
+                Path.GetFileName(name) == AudioPackLoader.AudioPackConfigName
+                || Path.GetFileName(name) == AudioPackLoader.RoutesConfigName
+                || AudioClipLoader.SupportedLoadExtensions.Contains(Path.GetExtension(name));
+        }
+
+        var pluginPath = Path.GetDirectoryName(Info.Location);
+        var audioPath = Path.Combine(pluginPath, "audio");
+
+        var hasAudioFilesInPlugins = false;
+
+        if (Directory.GetFiles(pluginPath).Any(IsAudioPackFile))
+            hasAudioFilesInPlugins = true;
+
+        if (Directory.Exists(audioPath) && Directory.GetFiles(audioPath).Any(IsAudioPackFile))
+            hasAudioFilesInPlugins = true;
+
+        if (hasAudioFilesInPlugins)
+        {
+            Logger.LogWarning("TODO OLD FILES IN PLUGINS!!!11111");
         }
     }
 
     private void Update()
     {
-        if (!_ranAssetModsDetection)
+        if (_reloadRequired)
         {
-            _ranAssetModsDetection = true;
-            DetectAssetMods();
+            _reloadRequired = false;
+            CheckForObsoleteStuff();
+
+            InitializeConfiguration();
+            AudioEngine.Reload();
+            InitializePackConfiguration();
         }
 
-        //try
-        //{
-        //    if (Input.GetKeyDown(DebugKeybind))
-        //    {
-        //        DebugDisplayActive = !DebugDisplayActive;
-        //        _debugDisplay.SetActive(DebugDisplayActive);
-        //    }
-        //}
-        //catch (Exception e)
-        //{
-        //    Logger.LogError(e);
-        //}
+        AudioEngine.Update();
     }
 
-    public void LoadModAudio(BaseUnityPlugin plugin, string audioFolder = null)
+    private void SceneManager_sceneLoaded(Scene scene, LoadSceneMode loadMode)
     {
-        if (plugin == this)
-            return;
-
-        LoadAudio(plugin, audioFolder);
+        StartCoroutine(CheckNewScene());
     }
 
-    private void LoadAudio(BaseUnityPlugin plugin, string audioFolder)
-    {
-        audioFolder ??= Path.Combine(Path.GetDirectoryName(plugin.Info.Location), "audio");
-
-        LoadAudioFromLocation(audioFolder, plugin.Info.Metadata.GUID);
-    }
-
-    private void LoadAudioFromLocation(string audioFolder, string id)
-    {
-        bool usedPath = id.StartsWith("ModAudio:path//");
-        string idClean = id.Replace("ModAudio:path//", "").Replace(Paths.PluginPath, "");
-
-        if (!_customAudio.TryGetValue(id, out var audio))
-            audio = _customAudio[id] = [];
-
-        if (!_customRoutes.TryGetValue(id, out var routes))
-            routes = _customRoutes[id] = new();
-
-        foreach (var file in Directory.GetFiles(audioFolder))
-        {
-            if (!AudioExtensions.Any(file.EndsWith))
-                continue;
-
-            var name = Path.GetFileNameWithoutExtension(file);
-
-            if (audio.ContainsKey(name))
-                return;
-
-            if (DetailedLogging)
-                Logger.LogInfo($"Loading {name} from {file}...");
-
-            try
-            {
-                var clip = ClipLoader.LoadFromFile(name, file);
-                audio[name] = clip;
-            }
-            catch (Exception e)
-            {
-                Logger.LogWarning($"Failed to load {name} from {file}!");
-                Logger.LogWarning($"Exception: {e}");
-            }
-        }
-
-        var routesPath = Path.Combine(audioFolder, "__routes.txt");
-
-        if (File.Exists(routesPath))
-        {
-            routes = _customRoutes[id] = RouteConfig.ReadTextFormat(routesPath);
-
-            foreach (var replacements in routes.ReplacedClips)
-            {
-                foreach (var replacement in replacements.Value)
-                {
-                    var randomWeight = replacement.RandomWeight;
-
-                    if (randomWeight < MinWeight)
-                    {
-                        Logger.LogWarning($"Weight {randomWeight} for {replacements.Value} => {replacement.Name} in {(usedPath ? "path" : "mod")} {id} is too low and was capped to {MinWeight}.");
-                        randomWeight = MinWeight;
-                    }
-
-                    if (randomWeight > MaxWeight)
-                    {
-                        Logger.LogWarning($"Weight {randomWeight} for {replacements.Value} => {replacement.Name} {(usedPath ? "path" : "mod")} {id} is too high and was capped to {MaxWeight}.");
-                        randomWeight = MaxWeight;
-                    }
-
-                    replacement.RandomWeight = randomWeight;
-                }
-            }
-        }
-
-        _modFoldersChecked.Add(Path.GetDirectoryName(routesPath));
-
-        if (audio.Count == 0 && routes.IsEmpty())
-        {
-            _customAudio.Remove(id);
-            _customRoutes.Remove(id);
-        }
-        else
-        {
-            Logger.LogInfo($"Loaded audio from {(usedPath ? "path" : "mod")} {idClean} ({audio.Count} clips, {routes.ReplacedClips.Count} routes, {routes.ReplacedClips.Select(x => x.Value).Sum(x => x.Count)} replacements).");
-        }
-    }
-
-    public void Reroute(AudioSource input)
-    {
-        var originalClip = input.clip;
-
-        if (_originalSources.TryGetValue(input, out var reference))
-        {
-            if (!reference.TryGetTarget(out originalClip))
-            {
-                _originalSources.Remove(input);
-            }
-        }
-
-        if (Resolve(originalClip, out var destination))
-        {
-            if (DetailedLogging)
-                Logger.LogInfo($"Rerouted \"{originalClip.name}\" => \"{destination.name}\"");
-
-            if (input.clip.name == destination.name)
-                return; // Same clip in audio source at the moment, don't need to do operations on it
-
-            if (!_originalSources.TryGetValue(input, out _))
-                _originalSources.Add(input, new WeakReference<AudioClip>(originalClip)); // Save the original clip if this is the first time we route it
-
-            // AudioSource needs to be restarted for the new clip to be applied
-            var wasPlaying = input.isPlaying;
-            input.Stop();
-
-            input.clip = destination;
-
-            if (wasPlaying)
-                input.Play();
-        }
-    }
-
-    internal bool Resolve(AudioClip source, out AudioClip destination)
-    {
-        if (source?.name == null)
-        {
-            destination = null;
-            return false;
-        }
-
-        // Clear just in case there's leftover garbage
-        _staticWeights.Clear();
-
-        if (_customAudio.ContainsKey(ModInfo.PLUGIN_GUID))
-        {
-            AddModWeights(source, ModInfo.PLUGIN_GUID);
-        }
-
-        if (!(OverrideCustomAudio && _staticWeights.Count > 0))
-        {
-            foreach (var guid in _customAudio.Keys)
-            {
-                if (guid == ModInfo.PLUGIN_GUID)
-                    continue;
-
-                AddModWeights(source, guid);
-            }
-        }
-
-        if (_staticWeights.Count == 0)
-        {
-            destination = null;
-            return false;
-        }
-
-        float totalWeight = _staticWeights.Sum(x => x.Item2);
-        float randomValue = (float)(_randomSource.NextDouble() * totalWeight);
-
-        int index = 0;
-        AudioClip selectedClip = source; // Use source as default if rolling doesn't succeed for some reason
-
-        while (randomValue > 0 && index < _staticWeights.Count)
-        {
-            selectedClip = _staticWeights[index].Item1;
-            randomValue -= _staticWeights[index].Item2;
-            index++;
-        }
-
-        // Clear to remove references
-        _staticWeights.Clear();
-        destination = selectedClip;
-        return true;
-    }
-
-    private void AddModWeights(AudioClip source, string id)
-    {
-        if (_customAudio[id].TryGetValue(source.name, out var destination))
-        {
-            _staticWeights.Add((destination, DefaultWeight));
-        }
-
-        if (_customRoutes[id].ReplacedClips.TryGetValue(source.name, out var replacements))
-        {
-            foreach (var replacement in replacements)
-            {
-                if (replacement.Name == DefaultClipIdentifier)
-                {
-                    // Special case to allow playing the default audio with a chance
-                    _staticWeights.Add((source, replacement.RandomWeight));
-                }
-
-                else if (_customAudio[id].TryGetValue(replacement.Name, out destination))
-                {
-                    _staticWeights.Add((destination, replacement.RandomWeight));
-                }
-            }
-        }
-    }
-
-    private void SceneManager_sceneLoaded(Scene arg0, LoadSceneMode arg1)
-    {
-        StartCoroutine(CheckNewScene(arg0));
-    }
-
-    System.Collections.IEnumerator CheckNewScene(Scene arg0)
+    System.Collections.IEnumerator CheckNewScene()
     {
         yield return null; // A frame delay should allow all objects to actually load in (?)
 
-        if (DetailedLogging)
+        if (VerboseReplacements.Value)
             Logger.LogInfo("Checking new scene for audio sources...");
 
         foreach (var audio in FindObjectsOfType<AudioSource>(true))
         {
-            if (DetailedLogging)
-                Logger.LogInfo($"  {audio.name} - {audio.clip?.name ?? "<No clip>"}");
-
-            Reroute(audio);
+            AudioEngine.AudioPlayed(audio);
         }
     }
 }

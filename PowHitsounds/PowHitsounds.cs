@@ -30,7 +30,7 @@ public class PowHitsounds : BaseUnityPlugin
         Instance = this;
         Logger = base.Logger;
 
-        ModAudio.ModAudio.Instance.LoadModAudio(this);
+        ModAudio.ModAudio.Plugin.LoadModAudio(this);
 
         Logger.LogInfo("Initialized successfully!");
     }
