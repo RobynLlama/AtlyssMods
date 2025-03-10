@@ -1,6 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-using BepInEx;
-using BepInEx.Bootstrap;
+﻿using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
@@ -63,20 +61,23 @@ public class ModAudio : BaseUnityPlugin
 
         SetupBaseAudioPack();
         InitializeConfiguration();
-
-        Logger.LogInfo("Initialized successfully!");
     }
 
-    public ConfigEntry<bool> VerboseLoading { get; private set; }
-    public ConfigEntry<bool> VerboseReplacements { get; private set; }
+    public ConfigEntry<bool> LogAudioLoading { get; private set; }
+    public ConfigEntry<bool> LogCustomAudio { get; private set; }
+    public ConfigEntry<bool> LogAudioEffects { get; private set; }
+    public ConfigEntry<bool> LogPlayedAudio { get; private set; }
+
     public ConfigEntry<bool> OverrideCustomAudio { get; private set; }
 
     public Dictionary<string, ConfigEntry<bool>> AudioPackEnabled { get; } = [];
 
     private void InitializeConfiguration()
     {
-        VerboseLoading = Config.Bind("Logging", nameof(VerboseLoading), false, Texts.VerboseLoadingDescription);
-        VerboseReplacements = Config.Bind("Logging", nameof(VerboseReplacements), false, Texts.VerboseRoutingDescription);
+        LogAudioLoading = Config.Bind("Logging", nameof(LogAudioLoading), false, Texts.LogAudioLoadingDescription);
+        LogCustomAudio = Config.Bind("Logging", nameof(LogCustomAudio), false, Texts.LogCustomAudioDescription);
+        LogAudioEffects = Config.Bind("Logging", nameof(LogAudioEffects), false, "TODO");
+        LogPlayedAudio = Config.Bind("Logging", nameof(LogPlayedAudio), false, "TODO");
         OverrideCustomAudio = Config.Bind("Logging", nameof(OverrideCustomAudio), false, Texts.OverrideCustomAudioDescription);
 
         if (EasySettings.IsAvailable)
@@ -87,8 +88,11 @@ public class ModAudio : BaseUnityPlugin
 
                 foreach (var pack in AudioEngine.AudioPacks)
                 {
-                    pack.Enabled = !AudioPackEnabled.TryGetValue(pack.Config.UniqueId, out var config) || config.Value;
-                    Logger.LogInfo($"Pack {pack.Config.UniqueId} is now {pack.Enabled}");
+                    var enabled = !AudioPackEnabled.TryGetValue(pack.Config.UniqueId, out var config) || config.Value;
+
+                    Logger.LogInfo($"Pack {pack.Config.UniqueId} is now {(enabled ? "enabled" : "disabled")}");
+
+                    pack.Enabled = enabled;
                 }
 
                 AudioEngine.SoftReload();
@@ -96,8 +100,10 @@ public class ModAudio : BaseUnityPlugin
             EasySettings.OnInitialized.AddListener(() =>
             {
                 EasySettings.AddHeader(ModInfo.PLUGIN_NAME);
-                EasySettings.AddToggle(Texts.VerboseReplacemensTitle, VerboseReplacements);
-                EasySettings.AddToggle(Texts.VerboseLoadingTitle, VerboseLoading);
+                EasySettings.AddToggle(Texts.LogAudioLoadingTitle, LogAudioLoading);
+                EasySettings.AddToggle(Texts.LogCustomAudioTitle, LogCustomAudio);
+                EasySettings.AddToggle("TODO Log Audio Effects", LogAudioEffects);
+                EasySettings.AddToggle("TODO Log Played Audio", LogPlayedAudio);
                 EasySettings.AddToggle(Texts.OverrideCustomAudioTitle, OverrideCustomAudio);
             });
         }
@@ -105,21 +111,37 @@ public class ModAudio : BaseUnityPlugin
 
     private void InitializePackConfiguration()
     {
-        if (EasySettings.IsAvailable)
+        bool addedHeader = false;
+
+        foreach (var pack in AudioEngine.AudioPacks)
         {
-            EasySettings.AddHeader($"{ModInfo.PLUGIN_NAME} audio packs");
-            EasySettings.AddButton(Texts.ReloadTitle, () => _reloadRequired = true);
-
-            foreach (var pack in AudioEngine.AudioPacks)
+            if (!AudioPackEnabled.TryGetValue(pack.Config.UniqueId, out var existingEntry))
             {
-                if (!AudioPackEnabled.ContainsKey(pack.Config.UniqueId))
+                if (!addedHeader)
                 {
-                    var enabled = Config.Bind("EnabledAudioPacks", pack.Config.UniqueId, true, Texts.EnablePackDescription(pack.Config.DisplayName));
+                    addedHeader = true;
 
-                    AudioPackEnabled[pack.Config.UniqueId] = enabled;
-                    EasySettings.AddToggle(pack.Config.DisplayName, enabled);
-                    pack.Enabled = enabled.Value;
+                    if (EasySettings.IsAvailable)
+                    {
+                        EasySettings.AddHeader($"{ModInfo.PLUGIN_NAME} audio packs");
+                        EasySettings.AddButton(Texts.ReloadTitle, () => _reloadRequired = true);
+                    }
                 }
+
+                var enabled = Config.Bind("EnabledAudioPacks", pack.Config.UniqueId, true, Texts.EnablePackDescription(pack.Config.DisplayName));
+
+                AudioPackEnabled[pack.Config.UniqueId] = enabled;
+
+                if (EasySettings.IsAvailable)
+                {
+                    EasySettings.AddToggle(pack.Config.DisplayName, enabled);
+                }
+
+                pack.Enabled = enabled.Value;
+            }
+            else
+            {
+                pack.Enabled = existingEntry.Value;
             }
         }
     }
@@ -158,8 +180,7 @@ public class ModAudio : BaseUnityPlugin
             _reloadRequired = false;
             CheckForObsoleteStuff();
 
-            InitializeConfiguration();
-            AudioEngine.Reload();
+            AudioEngine.HardReload();
             InitializePackConfiguration();
         }
 
@@ -174,9 +195,6 @@ public class ModAudio : BaseUnityPlugin
     System.Collections.IEnumerator CheckNewScene()
     {
         yield return null; // A frame delay should allow all objects to actually load in (?)
-
-        if (VerboseReplacements.Value)
-            Logger.LogInfo("Checking new scene for audio sources...");
 
         foreach (var audio in FindObjectsOfType<AudioSource>(true))
         {

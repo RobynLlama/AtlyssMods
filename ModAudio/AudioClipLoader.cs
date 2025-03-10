@@ -25,7 +25,7 @@ public static class AudioClipLoader
     /// <summary>
     /// Loads an audio clip in its entirety from the disk.
     /// </summary>
-    public static AudioClip LoadFromFile(string clipName, string path)
+    public static AudioClip LoadFromFile(string clipName, string path, float volumeModifier)
     {
         using var request = UnityWebRequestMultimedia.GetAudioClip(new Uri($"{path}"), AudioType.UNKNOWN);
         request.SendWebRequest();
@@ -42,29 +42,52 @@ public static class AudioClipLoader
 
         var clip = dlHandler.audioClip;
         clip.name = clipName;
+
+        // Adjust volume
+
+        float[] samples = new float[clip.samples * clip.channels];
+        clip.GetData(samples, 0);
+
+        unsafe
+        {
+            fixed (float* sample = samples)
+            {
+                float* current = sample;
+                float* end = sample + samples.Length;
+
+                while (current != end)
+                {
+                    *current = *current * volumeModifier;
+                    current++;
+                }
+            }
+        }
+
+        clip.SetData(samples, 0);
+
         return clip;
     }
 
     /// <summary>
     /// Streams an audio clip from the disk.
     /// </summary>
-    public static AudioClip StreamFromFile(string clipName, string path)
+    public static AudioClip StreamFromFile(string clipName, string path, float volumeModifier)
     {
         IAudioStream stream = null;
 
         if (path.EndsWith(".ogg"))
         {
-            stream = new OggStream(File.OpenRead(path));
+            stream = new OggStream(File.OpenRead(path)) { VolumeModifier = volumeModifier };
         }
 
         if (path.EndsWith(".mp3"))
         {
-            stream = new Mp3Stream(File.OpenRead(path));
+            stream = new Mp3Stream(File.OpenRead(path)) { VolumeModifier = volumeModifier };
         }
 
         if (path.EndsWith(".wav"))
         {
-            stream = new WavStream(File.OpenRead(path));
+            stream = new WavStream(File.OpenRead(path)) { VolumeModifier = volumeModifier };
         }
 
         if (stream == null)
@@ -87,6 +110,8 @@ public static class AudioClipLoader
     {
         private readonly NVorbis.VorbisReader _reader = new NVorbis.VorbisReader(stream);
 
+        public float VolumeModifier = 1f;
+
         public int TotalSamples => (int)_reader.TotalSamples;
         public int Channels => _reader.Channels;
         public int SampleRate => _reader.SampleRate;
@@ -94,6 +119,11 @@ public static class AudioClipLoader
         public void OnAudioRead(float[] data)
         {
             _reader.ReadSamples(data);
+
+            for (int i = 0; i < data.Length; i++)
+            {
+                data[i] *= VolumeModifier;
+            }
         }
 
         public void OnAudioSetPosition(int newPosition)
@@ -117,6 +147,8 @@ public static class AudioClipLoader
         private readonly WaveFileReader _reader;
         private readonly ISampleProvider _provider;
 
+        public float VolumeModifier = 1f;
+
         public int TotalSamples => (int)_reader.SampleCount;
         public int Channels => _reader.WaveFormat.Channels;
         public int SampleRate => _reader.WaveFormat.SampleRate;
@@ -124,6 +156,11 @@ public static class AudioClipLoader
         public void OnAudioRead(float[] data)
         {
             _provider.Read(data, 0, data.Length);
+
+            for (int i = 0; i < data.Length; i++)
+            {
+                data[i] *= VolumeModifier;
+            }
         }
 
         public void OnAudioSetPosition(int newPosition)
@@ -147,6 +184,8 @@ public static class AudioClipLoader
         private readonly Mp3FileReader _reader;
         private readonly ISampleProvider _provider;
 
+        public float VolumeModifier = 1f;
+
         public int TotalSamples => (int)(_reader.Length * 8 / _reader.WaveFormat.BitsPerSample);
         public int Channels => _reader.WaveFormat.Channels;
         public int SampleRate => _reader.WaveFormat.SampleRate;
@@ -154,6 +193,11 @@ public static class AudioClipLoader
         public void OnAudioRead(float[] data)
         {
             _provider.Read(data, 0, data.Length);
+
+            for (int i = 0; i < data.Length; i++)
+            {
+                data[i] *= VolumeModifier;
+            }
         }
 
         public void OnAudioSetPosition(int newPosition)

@@ -6,8 +6,7 @@ namespace Marioalexsan.ModAudio;
 
 public static class AudioPackLoader
 {
-    private const float OneMB = 1024f * 1024f;
-    private static ManualLogSource Logger => ModAudio.Plugin.Logger;
+    public const float OneMB = 1024f * 1024f;
 
     public const string AudioPackConfigName = "modaudio.config.json";
     public const string RoutesConfigName = "__routes.txt";
@@ -29,8 +28,7 @@ public static class AudioPackLoader
 
     private static string NormalizeId(string id)
     {
-        return id
-            .Replace("\\", "/");
+        return id.Replace("\\", "/");
     }
 
     private static string ConvertPathToId(string path)
@@ -91,21 +89,12 @@ public static class AudioPackLoader
         {
             foreach (var branch in replacement.Value)
             {
-                var randomWeight = branch.RandomWeight;
+                var clampedWeight = Mathf.Clamp(branch.RandomWeight, ModAudio.MinWeight, ModAudio.MaxWeight);
 
-                if (randomWeight < ModAudio.MinWeight)
-                {
-                    Logger.LogWarning($"Weight {randomWeight} for {branch.Original} => {branch.Target} is too low and was capped to {ModAudio.MinWeight}.");
-                    randomWeight = ModAudio.MinWeight;
-                }
+                if (clampedWeight != branch.RandomWeight)
+                    Logger.LogWarning(Texts.WeightClamped(clampedWeight, branch));
 
-                if (randomWeight > ModAudio.MaxWeight)
-                {
-                    Logger.LogWarning($"Weight {randomWeight} for {branch.Original} => {branch.Target} is too high and was capped to {ModAudio.MinWeight}.");
-                    randomWeight = ModAudio.MaxWeight;
-                }
-
-                branch.RandomWeight = randomWeight;
+                branch.RandomWeight = clampedWeight;
             }
         }
     }
@@ -132,7 +121,6 @@ public static class AudioPackLoader
 
                 if (pack != null)
                 {
-                    Logger.LogInfo($"Loaded audio pack {pack.Config.UniqueId} ({ReplaceRootPath(pack.PackPath)})");
                     packs.Add(pack);
                 }
 
@@ -147,7 +135,6 @@ public static class AudioPackLoader
 
                 if (pack != null)
                 {
-                    Logger.LogInfo($"Loaded legacy audio pack {pack.Config.UniqueId} ({ReplaceRootPath(pack.PackPath)})");
                     packs.Add(pack);
                 }
 
@@ -163,7 +150,6 @@ public static class AudioPackLoader
 
                     if (pack != null)
                     {
-                        Logger.LogInfo($"Loaded legacy audio pack {pack.Config.UniqueId} ({ReplaceRootPath(pack.PackPath)})");
                         packs.Add(pack);
                     }
 
@@ -175,6 +161,7 @@ public static class AudioPackLoader
 
     private static AudioPack LoadAudioPack(List<AudioPack> existingPacks, string path)
     {
+        Logger.LogInfo($"Loading audio pack from {path}", ModAudio.Plugin.LogAudioLoading);
         using var stream = File.OpenRead(path);
         AudioPackConfig config = AudioPackConfig.ReadJSON(stream);
 
@@ -192,7 +179,7 @@ public static class AudioPackLoader
         }
         else if (!IsNormalizedId(pack.Config.UniqueId))
         {
-            Logger.LogWarning($"Refusing to load pack from {path}, the ID {pack.Config.UniqueId} contains invalid characters.");
+            Logger.LogWarning(Texts.InvalidPackId(pack.PackPath, pack.Config.UniqueId));
             return null;
         }
 
@@ -204,7 +191,7 @@ public static class AudioPackLoader
 
         if (existingPacks.Any(x => x.Config.UniqueId == pack.Config.UniqueId))
         {
-            Logger.LogWarning($"Refusing to load pack from {path}, an audio pack with ID {pack.Config.UniqueId} already exists.");
+            Logger.LogWarning(Texts.DuplicatePackId(pack.PackPath, pack.Config.UniqueId));
             return null;
         }
 
@@ -214,7 +201,7 @@ public static class AudioPackLoader
         {
             if (pack.LoadedClips.Any(x => x.Value.name == clipData.UniqueId))
             {
-                Logger.LogWarning($"Refusing to load clip {clipData.UniqueId} from {clipData.Path}, a clip with that name was already loaded.");
+                Logger.LogWarning(Texts.DuplicateClipId(clipData.Path, clipData.UniqueId));
                 continue;
             }
 
@@ -222,7 +209,7 @@ public static class AudioPackLoader
 
             if (!clipPath.StartsWith(rootPath))
             {
-                Logger.LogWarning($"Refusing to load clip {clipData.UniqueId}, its path was outside of audio pack: {clipData.Path}.");
+                Logger.LogWarning(Texts.InvalidPackPath(clipData.Path, clipData.UniqueId));
                 continue;
             }
 
@@ -236,17 +223,23 @@ public static class AudioPackLoader
 
             if (useStreaming && !AudioClipLoader.SupportedStreamExtensions.Any(clipPath.EndsWith))
             {
+                Logger.LogWarning(Texts.AudioCannotBeStreamed(clipPath, fileSize));
                 useStreaming = false;
-                Logger.LogWarning(
-                    $"Audio file {clipPath} is a big audio file ({fileSize / OneMB}MB >= {FileSizeLimitForLoading / OneMB}MB), but it cannot be streamed using the current audio format." +
-                    $" Please try using one of the following supported formats for better performance: {string.Join(", ", AudioClipLoader.SupportedStreamExtensions)}"
-                );
             }
 
             try
             {
-                var clip = useStreaming ? AudioClipLoader.StreamFromFile(clipData.UniqueId, clipPath) : AudioClipLoader.LoadFromFile(clipData.UniqueId, clipPath);
-                pack.LoadedClips[clip.name] = clip;
+                Logger.LogInfo($"Loading {(useStreaming ? "streamed " : "")}clip {clipData.UniqueId} from {clipPath}", ModAudio.Plugin.LogAudioLoading);
+
+                if (useStreaming)
+                {
+                    // Opening a ton of streams at the start is not great, plus it adds a sizeable amount of load time if you have a lot of packs
+                    pack.DelayedLoadClips[clipData.UniqueId] = () => AudioClipLoader.StreamFromFile(clipData.UniqueId, clipPath, clipData.VolumeModifier);
+                }
+                else
+                {
+                    pack.LoadedClips[clipData.UniqueId] = AudioClipLoader.LoadFromFile(clipData.UniqueId, clipPath, clipData.VolumeModifier);
+                }
             }
             catch (Exception e)
             {
@@ -260,11 +253,12 @@ public static class AudioPackLoader
 
     private static AudioPack LoadLegacyAudioPack(List<AudioPack> existingPacks, string path)
     {
+        Logger.LogInfo($"Loading legacy pack from {path}", ModAudio.Plugin.LogAudioLoading);
         var id = NormalizeId(ReplaceRootPath(path));
 
         if (existingPacks.Any(x => x.Config.UniqueId == id))
         {
-            Logger.LogWarning($"Refusing to load pack from {path}, an audio pack with ID {id} already exists.");
+            Logger.LogWarning(Texts.DuplicatePackId(path, id));
             return null;
         }
 
@@ -295,28 +289,31 @@ public static class AudioPackLoader
 
             if (useStreaming && !AudioClipLoader.SupportedStreamExtensions.Any(file.EndsWith))
             {
+                Logger.LogWarning(Texts.AudioCannotBeStreamed(file, fileSize));
                 useStreaming = false;
-                Logger.LogWarning(
-                    $"Audio file {file} is a big audio file ({fileSize / OneMB}MB >= {FileSizeLimitForLoading / OneMB}MB), but it cannot be streamed using the current audio format." +
-                    $" Please try using one of the following supported formats for better performance: {string.Join(", ", AudioClipLoader.SupportedStreamExtensions)}"
-                );
             }
 
             var name = Path.GetFileNameWithoutExtension(file);
 
             if (pack.LoadedClips.ContainsKey(name))
             {
-                Logger.LogWarning($"Audio file {file} was not loaded, clip {name} was already loaded previously.");
+                Logger.LogWarning(Texts.DuplicateClipSkipped(file, name));
                 continue;
             }
 
-            if (ModAudio.Plugin.VerboseLoading.Value)
-                Logger.LogInfo($"Loading {name} from {file} with streaming set to {useStreaming}...");
-
             try
             {
-                var clip = useStreaming ? AudioClipLoader.StreamFromFile(name, file) : AudioClipLoader.LoadFromFile(name, file);
-                pack.LoadedClips[name] = clip;
+                Logger.LogInfo($"Loading {(useStreaming ? "streamed " : "")}clip {name} from {file}", ModAudio.Plugin.LogAudioLoading);
+
+                if (useStreaming)
+                {
+                    // Opening a ton of streams at the start is not great, plus it adds a sizeable amount of load time if you have a lot of packs
+                    pack.DelayedLoadClips[name] = () => AudioClipLoader.StreamFromFile(name, file, 1f);
+                }
+                else
+                {
+                    pack.LoadedClips[name] = AudioClipLoader.LoadFromFile(name, file, 1f);
+                }
             }
             catch (Exception e)
             {

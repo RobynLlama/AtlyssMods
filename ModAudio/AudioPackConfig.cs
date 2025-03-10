@@ -88,10 +88,10 @@ public class AudioPackConfig
     public class AudioEffect
     {
         [JsonProperty("target_clips", Required = Required.DisallowNull)]
-        public List<string> AffectedClips { get; set; } = [];
+        public List<string> TargetClips { get; set; } = [];
 
         [JsonProperty("target_audio_sources", Required = Required.DisallowNull)]
-        public List<string> AffectedAudioSources { get; set; } = [];
+        public List<string> TargetAudioSources { get; set; } = [];
 
         [JsonProperty("volume_modifier", Required = Required.DisallowNull)]
         public float? VolumeModifier { get; set; }
@@ -103,21 +103,36 @@ public class AudioPackConfig
     [JsonProperty("audio_effects", Required = Required.DisallowNull)]
     public List<AudioEffect> AudioEffects { get; set; } = [];
 
-    public class AudioEvent
+    public class PlayAudioEvent
     {
-        [JsonProperty("trigger", Required = Required.Always)]
-        public string Trigger { get; set; } = "";
+        [JsonProperty("target_clips", Required = Required.DisallowNull)]
+        public List<string> TargetClips { get; set; } = [];
 
-        [JsonProperty("action", Required = Required.Always)]
-        public string Action { get; set; } = "";
+        [JsonProperty("target_audio_sources", Required = Required.DisallowNull)]
+        public List<string> TargetAudioSources { get; set; } = [];
 
-        [JsonProperty("conditions", Required = Required.DisallowNull)]
-        public Dictionary<string, object> Conditions { get; set; } = [];
+        [JsonProperty("trigger_chance", Required = Required.DisallowNull)]
+        public float TriggerChance { get; set; } = 1f;
 
-        [JsonProperty("parameters", Required = Required.DisallowNull)]
-        public Dictionary<string, object> Parameters { get; set; } = [];
+        public class PlayAudioEventClip
+        {
+            [JsonProperty("clip_name", Required = Required.Always)]
+            public string ClipName { get; set; } = "";
+
+            [JsonProperty("random_weight", Required = Required.DisallowNull)]
+            public float RandomWeight { get; set; } = 1f;
+
+            [JsonProperty("volume", Required = Required.DisallowNull)]
+            public float Volume { get; set; } = 1f;
+
+            [JsonProperty("pitch", Required = Required.DisallowNull)]
+            public float Pitch { get; set; } = 1f;
+        }
+
+        [JsonProperty("clip_selection", Required = Required.Always)]
+        public List<PlayAudioEventClip> ClipSelection { get; set; } = [];
     }
 
-    [JsonProperty("audio_events", Required = Required.DisallowNull)]
-    public List<AudioEvent> AudioEvents { get; set; } = [];
+    [JsonProperty("play_audio_events", Required = Required.DisallowNull)]
+    public List<PlayAudioEvent> PlayAudioEvents { get; set; } = [];
 }
