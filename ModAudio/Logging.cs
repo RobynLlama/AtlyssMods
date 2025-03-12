@@ -3,7 +3,7 @@ using BepInEx.Logging;
 
 namespace Marioalexsan.ModAudio;
 
-internal static class Logger
+internal static class Logging
 {
     public static void LogFatal(object data, ConfigEntry<bool> toggle = null) => Log(data, LogLevel.Fatal, toggle);
     public static void LogError(object data, ConfigEntry<bool> toggle = null) => Log(data, LogLevel.Error, toggle);

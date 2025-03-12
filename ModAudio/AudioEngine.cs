@@ -23,13 +23,18 @@ internal static class AudioEngine
         public bool EffectsApplied;
         public bool Rerouted;
         public bool PlayAudioEventsApplied;
+        public bool IsOneShotSource;
+        public bool ProcessedOnStart;
+
+        // Misc
+        public AudioSource OneShotOrigin;
     }
 
     private static readonly System.Random RNG = new();
     private static readonly Dictionary<AudioSource, SourceState> TrackedSources = [];
+    private static readonly HashSet<AudioSource> TrackedPlayOnAwakeSources = [];
 
     private static readonly Stack<AudioSource> SourceCache = new Stack<AudioSource>(256);
-    private static readonly List<AudioSource> OneShotAudioSources = [];
 
     public static List<AudioPack> AudioPacks { get; } = [];
     public static IEnumerable<AudioPack> EnabledPacks => AudioPacks.Where(x => x.Enabled);
@@ -46,28 +51,36 @@ internal static class AudioEngine
 
     private static void Reload(bool hardReload)
     {
-        Logger.LogInfo("Reloading engine...");
+        Logging.LogInfo("Reloading engine...");
 
         if (hardReload)
         {
-            foreach (var source in OneShotAudioSources)
+            // Get rid of one-shots forcefully
+            SourceCache.Clear();
+
+            foreach (var source in TrackedSources)
             {
-                if (source != null)
-                    UnityEngine.Object.Destroy(source);
+                if (source.Value.IsOneShotSource)
+                {
+                    SourceCache.Push(source.Key);
+                }
             }
 
-            OneShotAudioSources.Clear();
+            while (SourceCache.Count > 0)
+            {
+                var source = SourceCache.Pop();
+                TrackedSources.Remove(source);
+                UnityEngine.Object.Destroy(source);
+            }
         }
 
+        // Restore previous state
         foreach (var source in TrackedSources)
         {
-            // Restore previous state
+            SourceCache.Push(source.Key);
+
             if (source.Value.Touched)
             {
-                // AudioSource needs to be restarted for the new originalClip to be applied
-                var wasPlaying = source.Key.isPlaying;
-                source.Key.Stop();
-
                 source.Key.clip = source.Value.Clip;
                 source.Key.volume = source.Value.Volume;
                 source.Key.pitch = source.Value.Pitch;
@@ -78,22 +91,65 @@ internal static class AudioEngine
 
         if (hardReload)
         {
-            Logger.LogInfo("Reloading audio packs...");
+            Logging.LogInfo("Reloading audio packs...");
 
             AudioPacks.Clear();
             AudioPacks.AddRange(AudioPackLoader.LoadAudioPacks());
         }
 
+        // Restart audio
         foreach (var audio in UnityEngine.Object.FindObjectsOfType<AudioSource>(true))
         {
-            AudioPlayed(audio);
+            //AudioPlayed(audio);
+
+            if (audio.isPlaying)
+            {
+                audio.Stop();
+                audio.Play();
+            }
         }
 
-        Logger.LogInfo("Done with reload!");
+        Logging.LogInfo("Done with reload!");
     }
 
     public static void Update()
     {
+        // Check play on awake sounds
+        bool checkPlayOnAwake = true;
+
+        if (checkPlayOnAwake)
+        {
+            foreach (var audio in UnityEngine.Object.FindObjectsOfType<AudioSource>(true))
+            {
+                if (audio.playOnAwake)
+                {
+                    if (!TrackedPlayOnAwakeSources.Contains(audio) && audio.isActiveAndEnabled)
+                    {
+                        TrackedPlayOnAwakeSources.Add(audio);
+                        AudioPlayed(audio);
+                    }
+                    else if (TrackedPlayOnAwakeSources.Contains(audio) && !audio.isActiveAndEnabled)
+                    {
+                        TrackedPlayOnAwakeSources.Remove(audio);
+                    }
+                }
+            }
+        }
+
+        // Cleanup dead play on awake sounds
+        SourceCache.Clear();
+
+        foreach (var source in TrackedPlayOnAwakeSources)
+        {
+            if (source == null)
+                SourceCache.Push(source);
+        }
+
+        while (SourceCache.Count > 0)
+        {
+            TrackedPlayOnAwakeSources.Remove(SourceCache.Pop());
+        }
+
         // Cleanup stale stuff
         SourceCache.Clear();
 
@@ -111,25 +167,22 @@ internal static class AudioEngine
         // Cleanup dead one shot sources
         SourceCache.Clear();
 
-        foreach (var source in OneShotAudioSources)
+        foreach (var source in TrackedSources)
         {
-            if (source == null || !source.isPlaying)
-                SourceCache.Push(source);
+            if (source.Value.IsOneShotSource && !source.Key.isPlaying)
+                SourceCache.Push(source.Key);
         }
 
         while (SourceCache.Count > 0)
         {
             var source = SourceCache.Pop();
+            TrackedSources.Remove(source);
 
             if (source != null)
                 UnityEngine.Object.Destroy(source);
-
-            OneShotAudioSources.Remove(source);
         }
 
-        // Check for any changes in tracked sources
-
-
+        // Check for any changes in tracked sources' clips
         foreach (var source in TrackedSources)
         {
             if (source.Key.clip != source.Value.AppliedClip)
@@ -161,7 +214,7 @@ internal static class AudioEngine
     {
         var oneShotSource = source.gameObject.AddComponent<AudioSource>();
 
-        oneShotSource.name = "modaudio_source";
+        oneShotSource.name = "modaudio_oneshot";
 
         oneShotSource.volume = source.volume;
         oneShotSource.pitch = source.pitch;
@@ -187,53 +240,82 @@ internal static class AudioEngine
         oneShotSource.maxDistance = source.maxDistance;
         oneShotSource.rolloffMode = source.rolloffMode;
 
-        // TODO custom curves?
-        // TODO other properties?
+        oneShotSource.playOnAwake = false; // This should be false for one shot sources, but whatever
+
+        oneShotSource.SetCustomCurve(AudioSourceCurveType.CustomRolloff, source.GetCustomCurve(AudioSourceCurveType.CustomRolloff));
+        oneShotSource.SetCustomCurve(AudioSourceCurveType.ReverbZoneMix, source.GetCustomCurve(AudioSourceCurveType.ReverbZoneMix));
+        oneShotSource.SetCustomCurve(AudioSourceCurveType.SpatialBlend, source.GetCustomCurve(AudioSourceCurveType.SpatialBlend));
+        oneShotSource.SetCustomCurve(AudioSourceCurveType.Spread, source.GetCustomCurve(AudioSourceCurveType.Spread));
+
+        TrackSource(oneShotSource);
+        TrackedSources[oneShotSource] = TrackedSources[oneShotSource] with { IsOneShotSource = true, OneShotOrigin = source };
 
         return oneShotSource;
     }
 
-    public static bool AudioPlayed(AudioSource source)
+    public static bool AudioStopped(AudioSource source, bool stopOneShots)
     {
-        Logger.LogInfo($"Audio source playing: source {source.name}, clip {source.clip}", ModAudio.Plugin.LogPlayedAudio);
-
-        if (OneShotAudioSources.Contains(source))
-            return true; // Do not reprocess these, would probably create an infinite loop somewhere
-
-        TrackSource(source);
-
-        Reroute(source);
-        ApplyEffects(source);
-        ApplyTriggers(source);
+        if (stopOneShots)
+        {
+            foreach (var trackedSource in TrackedSources)
+            {
+                if (trackedSource.Value.IsOneShotSource && trackedSource.Value.OneShotOrigin == source && trackedSource.Key != null && trackedSource.Key.isPlaying)
+                    trackedSource.Key.Stop();
+            }
+        }
 
         return true;
     }
 
-    public static bool ClipPlayed(AudioClip clip, AudioSource source)
+    public static bool OneShotClipPlayed(AudioClip clip, AudioSource source, float volumeScale)
     {
-        Logger.LogInfo($"Clip playing: clip {source.clip}, host source {source.name}", ModAudio.Plugin.LogPlayedAudio);
-
-        if (TryGetReplacement(clip, out var destination) && clip != destination)
-        {
-            Logger.LogInfo($"Clip replaced: {clip.name} => {destination.name}", ModAudio.Plugin.LogCustomAudio);
-            clip = destination;
-        }
-
         // Move to a dedicated audio source for better control. Note: This is likely overkill and might mess with other mods?
 
         var oneShotSource = CreateOneShotFromSource(source);
+        oneShotSource.volume *= volumeScale;
         oneShotSource.clip = clip;
 
-        OneShotAudioSources.Add(oneShotSource);
-
-        TrackSource(oneShotSource);
-
-        ApplyEffects(oneShotSource);
-        ApplyTriggers(oneShotSource);
+        TrackedSources[oneShotSource] = TrackedSources[oneShotSource] with { Clip = clip, Volume = oneShotSource.volume };
 
         oneShotSource.Play();
 
         return false;
+    }
+
+    public static bool AudioPlayed(AudioSource source)
+    {
+        bool processed = TrackedSources.TryGetValue(source, out var state) && state.ProcessedOnStart;
+        bool restarted = false;
+
+        if (!processed)
+        {
+            TrackSource(source);
+            TrackedSources[source] = TrackedSources[source] with { ProcessedOnStart = true };
+
+            Reroute(source);
+            ApplyEffects(source);
+            ApplyTriggers(source);
+
+            if (source.isPlaying)
+            {
+                restarted = true;
+                source.Stop();
+                source.Play();
+            }
+        }
+
+        // If it has been restarted, then Play() has been called again
+        // This means that we need to skip logging and running the original method for this call
+        if (!restarted)
+        {
+            var originalClipName = TrackedSources[source].Clip?.name ?? "(null)";
+            var currentClipName = source.clip?.name ?? "(null)";
+            bool rerouted = TrackedSources[source].Rerouted;
+
+            Logging.LogInfo($"Clip {originalClipName} ({source.name}){(rerouted ? $" => {currentClipName}" : "")}", ModAudio.Plugin.LogPlayedAudio);
+        }
+
+        return !restarted;
     }
 
     private static void ApplyTriggers(AudioSource source)
@@ -282,27 +364,26 @@ internal static class AudioEngine
 
                 if (pack.TryGetReadyClip(selectedClipData.ClipName, out var selectedClip))
                 {
-
                     var oneShotSource = CreateOneShotFromSource(source);
 
                     oneShotSource.pitch = selectedClipData.Pitch;
                     oneShotSource.volume = selectedClipData.Volume;
                     oneShotSource.clip = selectedClip;
 
-                    OneShotAudioSources.Add(oneShotSource);
-
-                    TrackSource(oneShotSource);
-
-                    TrackedSources[oneShotSource] = TrackedSources[oneShotSource] with { PlayAudioEventsApplied = true };
-
-                    ApplyEffects(oneShotSource);
-                    // No ApplyTriggers(oneShotSource) here - play triggers shouldn't trigger other triggers
+                    TrackedSources[oneShotSource] = TrackedSources[oneShotSource] with { 
+                        PlayAudioEventsApplied = true,
+                        Pitch = oneShotSource.pitch,
+                        Volume = oneShotSource.volume,
+                        Clip = oneShotSource.clip
+                    };
 
                     oneShotSource.Play();
+
+                    Logging.LogInfo($"Triggered clip {oneShotSource.clip?.name ?? "(null)"} on {source.clip?.name} ({source.name}).", ModAudio.Plugin.LogAudioEffects);
                 }
                 else
                 {
-                    Logger.LogWarning($"TODO Couldn't get clip {selectedClipData} to play for audio event!");
+                    Logging.LogWarning($"TODO Couldn't get clip {selectedClipData} to play for audio event!");
                 }
             }
         }
@@ -329,10 +410,6 @@ internal static class AudioEngine
                 if (effect.TargetAudioSources.Count > 0 && !effect.TargetAudioSources.Contains(source.name))
                     continue;
 
-                // AudioSource needs to be restarted for the new pitch to be applied
-                var wasPlaying = source.isPlaying;
-                source.Stop();
-
                 if (effect.VolumeModifier.HasValue)
                 {
                     source.volume *= effect.VolumeModifier.Value;
@@ -343,10 +420,7 @@ internal static class AudioEngine
                     source.pitch *= effect.PitchModifier.Value;
                 }
 
-                if (wasPlaying)
-                    source.Play();
-
-                Logger.LogInfo($"TODO Applied effect to {source.name} {source.clip.name}: volume {effect.VolumeModifier.GetValueOrDefault(1)}, pitch {effect.PitchModifier.GetValueOrDefault(1)}", ModAudio.Plugin.LogAudioEffects);
+                Logging.LogInfo($"Applied effects to clip {source.clip?.name ?? "(null)"}: volume {effect.VolumeModifier.GetValueOrDefault(1)}, pitch {effect.PitchModifier.GetValueOrDefault(1)}", ModAudio.Plugin.LogAudioEffects);
                 effectApplied = true;
                 break;
             }
@@ -372,16 +446,9 @@ internal static class AudioEngine
 
             TrackedSources[source] = TrackedSources[source] with { AppliedClip = destination, Rerouted = true };
 
-            // AudioSource needs to be restarted for the new originalClip to be applied
-            var wasPlaying = source.isPlaying;
-            source.Stop();
-
             source.clip = destination;
 
-            if (wasPlaying)
-                source.Play();
-
-            Logger.LogInfo($"Rerouted source {source.name} from {originalClip.name} to {destination.name}.", ModAudio.Plugin.LogCustomAudio);
+            Logging.LogInfo($"Replaced clip {originalClip.name} with {destination.name}.", ModAudio.Plugin.LogCustomAudio);
         }
     }
 

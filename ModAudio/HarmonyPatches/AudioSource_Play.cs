@@ -21,5 +21,11 @@ static class AudioSource_Play
 [HarmonyPatch(typeof(AudioSource), nameof(AudioSource.PlayOneShotHelper))]
 static class AudioSource_PlayOneShotHelper
 {
-    static bool Prefix(AudioSource source, AudioClip clip) => AudioEngine.ClipPlayed(clip, source);
+    static bool Prefix(AudioSource source, AudioClip clip, float volumeScale) => AudioEngine.OneShotClipPlayed(clip, source, volumeScale);
+}
+
+[HarmonyPatch(typeof(AudioSource), nameof(AudioSource.Stop), typeof(bool))]
+static class AudioSource_Stop
+{
+    static bool Prefix(AudioSource __instance, bool stopOneShots) => AudioEngine.AudioStopped(__instance, stopOneShots);
 }

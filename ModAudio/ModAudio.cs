@@ -3,6 +3,7 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using Marioalexsan.ModAudio.SoftDependencies;
+using Mono.Cecil;
 using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -189,16 +190,20 @@ public class ModAudio : BaseUnityPlugin
 
     private void SceneManager_sceneLoaded(Scene scene, LoadSceneMode loadMode)
     {
-        StartCoroutine(CheckNewScene());
+        //StartCoroutine(CheckNewScene());
     }
 
     System.Collections.IEnumerator CheckNewScene()
     {
         yield return null; // A frame delay should allow all objects to actually load in (?)
 
+        Logging.LogInfo($"Scene objects detected:", ModAudio.Plugin.LogPlayedAudio);
+
         foreach (var audio in FindObjectsOfType<AudioSource>(true))
         {
             AudioEngine.AudioPlayed(audio);
         }
+
+        Logging.LogInfo($"Done checking scene objects.", ModAudio.Plugin.LogPlayedAudio);
     }
 }

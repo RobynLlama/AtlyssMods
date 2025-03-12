@@ -92,7 +92,7 @@ public static class AudioPackLoader
                 var clampedWeight = Mathf.Clamp(branch.RandomWeight, ModAudio.MinWeight, ModAudio.MaxWeight);
 
                 if (clampedWeight != branch.RandomWeight)
-                    Logger.LogWarning(Texts.WeightClamped(clampedWeight, branch));
+                    Logging.LogWarning(Texts.WeightClamped(clampedWeight, branch));
 
                 branch.RandomWeight = clampedWeight;
             }
@@ -161,7 +161,7 @@ public static class AudioPackLoader
 
     private static AudioPack LoadAudioPack(List<AudioPack> existingPacks, string path)
     {
-        Logger.LogInfo($"Loading audio pack from {path}", ModAudio.Plugin.LogAudioLoading);
+        Logging.LogInfo($"Loading audio pack from {path}", ModAudio.Plugin.LogAudioLoading);
         using var stream = File.OpenRead(path);
         AudioPackConfig config = AudioPackConfig.ReadJSON(stream);
 
@@ -179,7 +179,7 @@ public static class AudioPackLoader
         }
         else if (!IsNormalizedId(pack.Config.UniqueId))
         {
-            Logger.LogWarning(Texts.InvalidPackId(pack.PackPath, pack.Config.UniqueId));
+            Logging.LogWarning(Texts.InvalidPackId(pack.PackPath, pack.Config.UniqueId));
             return null;
         }
 
@@ -191,7 +191,7 @@ public static class AudioPackLoader
 
         if (existingPacks.Any(x => x.Config.UniqueId == pack.Config.UniqueId))
         {
-            Logger.LogWarning(Texts.DuplicatePackId(pack.PackPath, pack.Config.UniqueId));
+            Logging.LogWarning(Texts.DuplicatePackId(pack.PackPath, pack.Config.UniqueId));
             return null;
         }
 
@@ -201,7 +201,7 @@ public static class AudioPackLoader
         {
             if (pack.LoadedClips.Any(x => x.Value.name == clipData.UniqueId))
             {
-                Logger.LogWarning(Texts.DuplicateClipId(clipData.Path, clipData.UniqueId));
+                Logging.LogWarning(Texts.DuplicateClipId(clipData.Path, clipData.UniqueId));
                 continue;
             }
 
@@ -209,7 +209,7 @@ public static class AudioPackLoader
 
             if (!clipPath.StartsWith(rootPath))
             {
-                Logger.LogWarning(Texts.InvalidPackPath(clipData.Path, clipData.UniqueId));
+                Logging.LogWarning(Texts.InvalidPackPath(clipData.Path, clipData.UniqueId));
                 continue;
             }
 
@@ -223,13 +223,13 @@ public static class AudioPackLoader
 
             if (useStreaming && !AudioClipLoader.SupportedStreamExtensions.Any(clipPath.EndsWith))
             {
-                Logger.LogWarning(Texts.AudioCannotBeStreamed(clipPath, fileSize));
+                Logging.LogWarning(Texts.AudioCannotBeStreamed(clipPath, fileSize));
                 useStreaming = false;
             }
 
             try
             {
-                Logger.LogInfo($"Loading {(useStreaming ? "streamed " : "")}clip {clipData.UniqueId} from {clipPath}", ModAudio.Plugin.LogAudioLoading);
+                Logging.LogInfo($"Loading {(useStreaming ? "streamed " : "")}clip {clipData.UniqueId} from {clipPath}", ModAudio.Plugin.LogAudioLoading);
 
                 if (useStreaming)
                 {
@@ -243,8 +243,8 @@ public static class AudioPackLoader
             }
             catch (Exception e)
             {
-                Logger.LogWarning($"Failed to load {clipData.UniqueId} from {clipPath}!");
-                Logger.LogWarning($"Exception: {e}");
+                Logging.LogWarning($"Failed to load {clipData.UniqueId} from {clipPath}!");
+                Logging.LogWarning($"Exception: {e}");
             }
         }
 
@@ -253,12 +253,12 @@ public static class AudioPackLoader
 
     private static AudioPack LoadLegacyAudioPack(List<AudioPack> existingPacks, string path)
     {
-        Logger.LogInfo($"Loading legacy pack from {path}", ModAudio.Plugin.LogAudioLoading);
+        Logging.LogInfo($"Loading legacy pack from {path}", ModAudio.Plugin.LogAudioLoading);
         var id = NormalizeId(ReplaceRootPath(path));
 
         if (existingPacks.Any(x => x.Config.UniqueId == id))
         {
-            Logger.LogWarning(Texts.DuplicatePackId(path, id));
+            Logging.LogWarning(Texts.DuplicatePackId(path, id));
             return null;
         }
 
@@ -289,7 +289,7 @@ public static class AudioPackLoader
 
             if (useStreaming && !AudioClipLoader.SupportedStreamExtensions.Any(file.EndsWith))
             {
-                Logger.LogWarning(Texts.AudioCannotBeStreamed(file, fileSize));
+                Logging.LogWarning(Texts.AudioCannotBeStreamed(file, fileSize));
                 useStreaming = false;
             }
 
@@ -297,13 +297,13 @@ public static class AudioPackLoader
 
             if (pack.LoadedClips.ContainsKey(name))
             {
-                Logger.LogWarning(Texts.DuplicateClipSkipped(file, name));
+                Logging.LogWarning(Texts.DuplicateClipSkipped(file, name));
                 continue;
             }
 
             try
             {
-                Logger.LogInfo($"Loading {(useStreaming ? "streamed " : "")}clip {name} from {file}", ModAudio.Plugin.LogAudioLoading);
+                Logging.LogInfo($"Loading {(useStreaming ? "streamed " : "")}clip {name} from {file}", ModAudio.Plugin.LogAudioLoading);
 
                 if (useStreaming)
                 {
@@ -317,8 +317,8 @@ public static class AudioPackLoader
             }
             catch (Exception e)
             {
-                Logger.LogWarning($"Failed to load {name} from {file}!");
-                Logger.LogWarning($"Exception: {e}");
+                Logging.LogWarning($"Failed to load {name} from {file}!");
+                Logging.LogWarning($"Exception: {e}");
             }
         }
 
