@@ -75,7 +75,7 @@ public static class AudioPackLoader
     {
         // Validate / normalize / remap stuff
 
-        foreach (var replacement in pack.Config.ClipReplacements)
+        foreach (var replacement in pack.Config.Replacements)
         {
             if (!pack.Replacements.ContainsKey(replacement.Original))
             {
@@ -171,15 +171,14 @@ public static class AudioPackLoader
             PackPath = path
         };
 
-
-        if (string.IsNullOrEmpty(pack.Config.UniqueId))
+        if (string.IsNullOrEmpty(pack.Config.Id))
         {
             // Assign an ID based on location
-            pack.Config.UniqueId = ConvertPathToId(pack.PackPath);
+            pack.Config.Id = ConvertPathToId(pack.PackPath);
         }
-        else if (!IsNormalizedId(pack.Config.UniqueId))
+        else if (!IsNormalizedId(pack.Config.Id))
         {
-            Logging.LogWarning(Texts.InvalidPackId(pack.PackPath, pack.Config.UniqueId));
+            Logging.LogWarning(Texts.InvalidPackId(pack.PackPath, pack.Config.Id));
             return null;
         }
 
@@ -189,19 +188,19 @@ public static class AudioPackLoader
             pack.Config.DisplayName = ConvertPathToDisplayName(pack.PackPath);
         }
 
-        if (existingPacks.Any(x => x.Config.UniqueId == pack.Config.UniqueId))
+        if (existingPacks.Any(x => x.Config.Id == pack.Config.Id))
         {
-            Logging.LogWarning(Texts.DuplicatePackId(pack.PackPath, pack.Config.UniqueId));
+            Logging.LogWarning(Texts.DuplicatePackId(pack.PackPath, pack.Config.Id));
             return null;
         }
 
         var rootPath = Path.GetFullPath(Path.GetDirectoryName(path));
 
-        foreach (var clipData in config.AudioClips)
+        foreach (var clipData in config.CustomClips)
         {
-            if (pack.LoadedClips.Any(x => x.Value.name == clipData.UniqueId))
+            if (pack.LoadedClips.Any(x => x.Value.name == clipData.Name))
             {
-                Logging.LogWarning(Texts.DuplicateClipId(clipData.Path, clipData.UniqueId));
+                Logging.LogWarning(Texts.DuplicateClipId(clipData.Path, clipData.Name));
                 continue;
             }
 
@@ -209,7 +208,7 @@ public static class AudioPackLoader
 
             if (!clipPath.StartsWith(rootPath))
             {
-                Logging.LogWarning(Texts.InvalidPackPath(clipData.Path, clipData.UniqueId));
+                Logging.LogWarning(Texts.InvalidPackPath(clipData.Path, clipData.Name));
                 continue;
             }
 
@@ -229,23 +228,30 @@ public static class AudioPackLoader
 
             try
             {
-                Logging.LogInfo($"Loading {(useStreaming ? "streamed " : "")}clip {clipData.UniqueId} from {clipPath}", ModAudio.Plugin.LogAudioLoading);
+                Logging.LogInfo($"Loading {(useStreaming ? "streamed " : "")}clip {clipData.Name} from {clipPath}", ModAudio.Plugin.LogAudioLoading);
 
                 if (useStreaming)
                 {
                     // Opening a ton of streams at the start is not great, plus it adds a sizeable amount of load time if you have a lot of packs
-                    pack.DelayedLoadClips[clipData.UniqueId] = () => AudioClipLoader.StreamFromFile(clipData.UniqueId, clipPath, clipData.VolumeModifier);
+                    pack.DelayedLoadClips[clipData.Name] = () => AudioClipLoader.StreamFromFile(clipData.Name, clipPath, clipData.Volume);
                 }
                 else
                 {
-                    pack.LoadedClips[clipData.UniqueId] = AudioClipLoader.LoadFromFile(clipData.UniqueId, clipPath, clipData.VolumeModifier);
+                    pack.LoadedClips[clipData.Name] = AudioClipLoader.LoadFromFile(clipData.Name, clipPath, clipData.Volume);
                 }
             }
             catch (Exception e)
             {
-                Logging.LogWarning($"Failed to load {clipData.UniqueId} from {clipPath}!");
+                Logging.LogWarning($"Failed to load {clipData.Name} from {clipPath}!");
                 Logging.LogWarning($"Exception: {e}");
             }
+        }
+
+        if (pack.Config.AudioPackSettings.AutoloadReplacementClips)
+        {
+            Logging.LogInfo($"Autoloading replacement clips from {path}", ModAudio.Plugin.LogAudioLoading);
+
+            AutoLoadReplacementClipsFromPath(path, pack);
         }
 
         return pack;
@@ -256,7 +262,7 @@ public static class AudioPackLoader
         Logging.LogInfo($"Loading legacy pack from {path}", ModAudio.Plugin.LogAudioLoading);
         var id = NormalizeId(ReplaceRootPath(path));
 
-        if (existingPacks.Any(x => x.Config.UniqueId == id))
+        if (existingPacks.Any(x => x.Config.Id == id))
         {
             Logging.LogWarning(Texts.DuplicatePackId(path, id));
             return null;
@@ -265,6 +271,13 @@ public static class AudioPackLoader
         AudioPack pack = new()
         {
             PackPath = path,
+            Config =
+            {
+                AudioPackSettings =
+                {
+                    AutoloadReplacementClips = true
+                }
+            }
         };
 
         // Add explicit routes
@@ -275,8 +288,15 @@ public static class AudioPackLoader
         }
 
         pack.Config.DisplayName = ConvertPathToDisplayName(path);
-        pack.Config.UniqueId = ConvertPathToId(path);
+        pack.Config.Id = ConvertPathToId(path);
 
+        AutoLoadReplacementClipsFromPath(path, pack);
+
+        return pack;
+    }
+
+    private static void AutoLoadReplacementClipsFromPath(string path, AudioPack pack)
+    {
         foreach (var file in Directory.GetFiles(Path.GetDirectoryName(path)))
         {
             bool isAudioFile = AudioClipLoader.SupportedStreamExtensions.Any(file.EndsWith) || AudioClipLoader.SupportedLoadExtensions.Any(file.EndsWith);
@@ -325,14 +345,12 @@ public static class AudioPackLoader
         // Add implicit routes
         foreach (var clip in pack.LoadedClips)
         {
-            pack.Config.ClipReplacements.Add(new()
+            pack.Config.Replacements.Add(new()
             {
                 Original = clip.Key,
                 Target = clip.Key,
                 RandomWeight = 1f
             });
         }
-
-        return pack;
     }
 }

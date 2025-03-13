@@ -13,7 +13,7 @@ def keep_assembly_dependency(assembly):
     "BepInEx.AssemblyPublicizer",
     "Microsoft.Win32",
     "Newtonsoft.Json",
-    "System.",
+    #"System.",
   ]
 
   for part in IGNORED_ASSEMBLIES:

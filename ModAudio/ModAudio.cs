@@ -42,12 +42,13 @@ public class ModAudio : BaseUnityPlugin
         {
             var modConfig = new AudioPackConfig
             {
-                UniqueId = ModInfo.PLUGIN_GUID,
+                Id = ModInfo.PLUGIN_GUID,
                 DisplayName = ModInfo.PLUGIN_NAME,
             };
 
             File.WriteAllText(modConfigPath, JsonConvert.SerializeObject(modConfig));
             VanillaClipNames.GenerateReferenceFile(Path.Combine(ModAudioConfigFolder, "clip_names.txt"));
+            File.WriteAllText(Path.Combine(ModAudioConfigFolder, "audiopack_schema.json"), AudioPackConfig.GenerateSchema());
         }
     }
 
@@ -89,9 +90,9 @@ public class ModAudio : BaseUnityPlugin
 
                 foreach (var pack in AudioEngine.AudioPacks)
                 {
-                    var enabled = !AudioPackEnabled.TryGetValue(pack.Config.UniqueId, out var config) || config.Value;
+                    var enabled = !AudioPackEnabled.TryGetValue(pack.Config.Id, out var config) || config.Value;
 
-                    Logger.LogInfo($"Pack {pack.Config.UniqueId} is now {(enabled ? "enabled" : "disabled")}");
+                    Logger.LogInfo($"Pack {pack.Config.Id} is now {(enabled ? "enabled" : "disabled")}");
 
                     pack.Enabled = enabled;
                 }
@@ -116,7 +117,7 @@ public class ModAudio : BaseUnityPlugin
 
         foreach (var pack in AudioEngine.AudioPacks)
         {
-            if (!AudioPackEnabled.TryGetValue(pack.Config.UniqueId, out var existingEntry))
+            if (!AudioPackEnabled.TryGetValue(pack.Config.Id, out var existingEntry))
             {
                 if (!addedHeader)
                 {
@@ -129,9 +130,9 @@ public class ModAudio : BaseUnityPlugin
                     }
                 }
 
-                var enabled = Config.Bind("EnabledAudioPacks", pack.Config.UniqueId, true, Texts.EnablePackDescription(pack.Config.DisplayName));
+                var enabled = Config.Bind("EnabledAudioPacks", pack.Config.Id, true, Texts.EnablePackDescription(pack.Config.DisplayName));
 
-                AudioPackEnabled[pack.Config.UniqueId] = enabled;
+                AudioPackEnabled[pack.Config.Id] = enabled;
 
                 if (EasySettings.IsAvailable)
                 {

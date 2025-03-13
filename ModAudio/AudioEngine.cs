@@ -337,7 +337,7 @@ internal static class AudioEngine
                 if (trigger.TargetClips.Count > 0 && !trigger.TargetClips.Contains(source.clip?.name))
                     continue;
 
-                if (trigger.TargetAudioSources.Count > 0 && !trigger.TargetAudioSources.Contains(source.name))
+                if (trigger.TargetSources.Count > 0 && !trigger.TargetSources.Contains(source.name))
                     continue;
 
                 if (RNG.NextDouble() > trigger.TriggerChance)
@@ -400,27 +400,27 @@ internal static class AudioEngine
 
         foreach (var pack in EnabledPacks)
         {
-            foreach (var effect in pack.Config.AudioEffects)
+            foreach (var effect in pack.Config.Effects)
             {
                 // TODO: Effects that don't specify any targets or modifiers should be considered as invalid
 
                 if (effect.TargetClips.Count > 0 && !effect.TargetClips.Contains(source.clip?.name))
                     continue;
 
-                if (effect.TargetAudioSources.Count > 0 && !effect.TargetAudioSources.Contains(source.name))
+                if (effect.TargetSources.Count > 0 && !effect.TargetSources.Contains(source.name))
                     continue;
 
-                if (effect.VolumeModifier.HasValue)
+                if (effect.Volume.HasValue)
                 {
-                    source.volume *= effect.VolumeModifier.Value;
+                    source.volume *= effect.Volume.Value;
                 }
 
-                if (effect.PitchModifier.HasValue)
+                if (effect.Pitch.HasValue)
                 {
-                    source.pitch *= effect.PitchModifier.Value;
+                    source.pitch *= effect.Pitch.Value;
                 }
 
-                Logging.LogInfo($"Applied effects to clip {source.clip?.name ?? "(null)"}: volume {effect.VolumeModifier.GetValueOrDefault(1)}, pitch {effect.PitchModifier.GetValueOrDefault(1)}", ModAudio.Plugin.LogAudioEffects);
+                Logging.LogInfo($"Applied effects to clip {source.clip?.name ?? "(null)"}: volume {effect.Volume.GetValueOrDefault(1)}, pitch {effect.Pitch.GetValueOrDefault(1)}", ModAudio.Plugin.LogAudioEffects);
                 effectApplied = true;
                 break;
             }
