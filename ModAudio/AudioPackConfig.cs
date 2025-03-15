@@ -1,142 +1,246 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Schema;
+using UnityEngine;
 
 namespace Marioalexsan.ModAudio;
 
 public class AudioPackConfig
 {
+    /// <summary>
+    /// An unique identifier for your audio pack.
+    /// It would be a good idea to not change this once you publish your pack.
+    /// For example, you could use "YourName_YourPackName" as the identifier.
+    /// </summary>
     [JsonProperty("id", Required = Required.DisallowNull)]
     public string Id { get; set; } = "";
 
+    /// <summary>
+    /// A user-readable display name for your audio pack. Used in the UI.
+    /// </summary>
     [JsonProperty("display_name", Required = Required.DisallowNull)]
     public string DisplayName { get; set; } = "";
 
     public class Settings
     {
+        /// <summary>
+        /// If true, vanilla clips will be automatically loaded and replaced based on name.
+        /// For example, _mu_flyby.ogg would be loaded and replace _mu_flyby in-game.
+        /// </summary>
         [JsonProperty("autoload_replacement_clips", Required = Required.DisallowNull)]
         public bool AutoloadReplacementClips { get; set; } = true;
     }
 
+    /// <summary>
+    /// Holds settings for the audio pack.
+    /// </summary>
     [JsonProperty("settings", Required = Required.DisallowNull)]
     public Settings AudioPackSettings { get; set; } = new();
 
     public class AudioClipData
     {
+        /// <summary>
+        /// An unique name for your clip.
+        /// It would be a good idea to use something that wouldn't conflict with other pack clip names.
+        /// </summary>
         [JsonProperty("name", Required = Required.Always)]
         public string Name { get; set; } = "";
 
+        /// <summary>
+        /// The relative path to your clip's audio file.
+        /// </summary>
         [JsonProperty("path", Required = Required.DisallowNull)]
         public string Path { get; set; } = "";
 
+        /// <summary>
+        /// A volume modifier for your clip.
+        /// This is the only place where you can amplify audio by using modifiers above 1.0.
+        /// </summary>
         [JsonProperty("volume", Required = Required.DisallowNull)]
         public float Volume { get; set; } = 1f;
+
+        /// <summary>
+        /// If true, extension is ignored (i.e. the first audio file matching the name is loaded).
+        /// If false, extension is taken into account (i.e. the exact audio file is loaded).
+        /// </summary>
+        [JsonProperty("ignore_clip_extension", Required = Required.DisallowNull)]
+        public bool IgnoreClipExtension { get; set; } = false;
     }
 
+    /// <summary>
+    /// A list of custom clips defined by your audio pack.
+    /// </summary>
     [JsonProperty("custom_clips", Required = Required.DisallowNull)]
     public List<AudioClipData> CustomClips { get; set; } = [];
 
-    public class ClipReplacement
+    public class Route
     {
-        [JsonProperty("original", Required = Required.Always)]
-        public string Original { get; set; } = "";
-
-        [JsonProperty("replacement", Required = Required.Always)]
-        public string Target { get; set; } = "";
-
-        [JsonProperty("weight", Required = Required.DisallowNull)]
-        public float RandomWeight { get; set; } = 1f;
-    }
-
-    [JsonProperty("clip_replacements", Required = Required.DisallowNull)]
-    public List<ClipReplacement> Replacements { get; set; } = [];
-
-    public class PlayAudioEvent
-    {
-        [JsonProperty("target_clips", Required = Required.DisallowNull)]
-        public List<string> TargetClips { get; set; } = [];
-
-        [JsonProperty("target_sources", Required = Required.DisallowNull)]
-        public List<string> TargetSources { get; set; } = [];
-
-        [JsonProperty("target_prefabs", Required = Required.DisallowNull)]
-        public List<string> TargetPrefabs { get; set; } = [];
-
-        [JsonProperty("trigger_chance", Required = Required.DisallowNull)]
-        public float TriggerChance { get; set; } = 1f;
-
-        public class PlayAudioEventClip
+        public class ClipSelection
         {
-            [JsonProperty("clip_name", Required = Required.Always)]
-            public string ClipName { get; set; } = "";
+            /// <summary>
+            /// The name of the clip.
+            /// A special value of "___default___" will select the original clip as replacement.
+            /// A special value of "___nothing___" replaces the audio clip with an empty one.
+            /// </summary>
+            [JsonProperty("name", Required = Required.Always)]
+            public string Name { get; set; } = "";
 
+            /// <summary>
+            /// How often it should be selected compared to other clips.
+            /// </summary>
             [JsonProperty("weight", Required = Required.DisallowNull)]
-            public float RandomWeight { get; set; } = 1f;
+            public float Weight { get; set; } = 1f;
 
+            /// <summary>
+            /// Volume adjustment for this selection.
+            /// </summary>
             [JsonProperty("volume", Required = Required.DisallowNull)]
             public float Volume { get; set; } = 1f;
 
+            /// <summary>
+            /// Pitch adjustment for this selection.
+            /// </summary>
             [JsonProperty("pitch", Required = Required.DisallowNull)]
             public float Pitch { get; set; } = 1f;
         }
 
-        [JsonProperty("clips", Required = Required.Always)]
-        public List<PlayAudioEventClip> ClipSelection { get; set; } = [];
-    }
+        /// <summary>
+        /// If true, overlays can only play if the replacement from the same route has been selected.
+        /// If false, overlays can play separately from the replacement.
+        /// </summary>
+        [JsonProperty("link_overlay_and_replacement", Required = Required.DisallowNull)]
+        public bool LinkOverlayAndReplacement { get; set; } = false;
 
-    [JsonProperty("audio_overlays", Required = Required.DisallowNull)]
-    public List<PlayAudioEvent> PlayAudioEvents { get; set; } = [];
+        /// <summary>
+        /// If true, replacement effects (volume, pitch, etc.) are modifiers on top of the original source.
+        /// If false, replacement effects override the original source's effects.
+        /// </summary>
+        [JsonProperty("relative_replacement_effects", Required = Required.DisallowNull)]
+        public bool RelativeReplacementEffects { get; set; } = true;
 
-    public class AudioEffect
-    {
-        [JsonProperty("target_clips", Required = Required.DisallowNull)]
-        public List<string> TargetClips { get; set; } = [];
+        /// <summary>
+        /// If true, overlay effects (volume, pitch, etc.) are modifiers on top of the original source.
+        /// If false, overlay effects override the original source's effects.
+        /// </summary>
+        [JsonProperty("relative_overlay_effects", Required = Required.DisallowNull)]
+        public bool RelativeOverlayEffects { get; set; } = false;
 
-        [JsonProperty("target_sources", Required = Required.DisallowNull)]
-        public List<string> TargetSources { get; set; } = [];
+        /// <summary>
+        /// A list of clips that will be affected by this route.
+        /// </summary>
+        [JsonProperty("original_clips", Required = Required.Always)]
+        public List<string> OriginalClips { get; set; } = [];
 
+        /// <summary>
+        /// A list of clips to be used as replacements for this route.
+        /// </summary>
+        [JsonProperty("replacement_clips", Required = Required.DisallowNull)]
+        public List<ClipSelection> ReplacementClips { get; set; } = [];
+
+        /// <summary>
+        /// A list of clips to be used as overlays for this route.
+        /// </summary>
+        [JsonProperty("overlay_clips", Required = Required.DisallowNull)]
+        public List<ClipSelection> OverlayClips { get; set; } = [];
+
+        /// <summary>
+        /// A list of source names that act as filters. If empty, the filter is disabled.
+        /// You can use this to discriminate between audio played using the same clip from different sources.
+        /// </summary>
+        [JsonProperty("filter_by_sources", Required = Required.DisallowNull)]
+        public List<string> FilterBySources { get; set; } = [];
+
+        /// <summary>
+        /// A list of object names in the hierarchy that act as filters. If empty, the filter is disabled.
+        /// You can use this to discriminate between audio played using the same clip from different objects.
+        /// </summary>
+        [JsonProperty("filter_by_object", Required = Required.DisallowNull)]
+        public List<string> FilterByObject { get; set; } = [];
+
+        /// <summary>
+        /// Determines how often the replacement from this route will be used relative to other replacements.
+        /// </summary>
+        [JsonProperty("replacement_weight", Required = Required.DisallowNull)]
+        public float ReplacementWeight { get; set; } = 1f;
+
+        /// <summary>
+        /// Volume modifier for the audio source.
+        /// </summary>
         [JsonProperty("volume", Required = Required.DisallowNull)]
-        public float? Volume { get; set; }
+        public float Volume { get; set; } = 1f;
 
+        /// <summary>
+        /// Pitch modifier for the audio source.
+        /// </summary>
         [JsonProperty("pitch", Required = Required.DisallowNull)]
-        public float? Pitch { get; set; }
+        public float Pitch { get; set; } = 1f;
     }
 
-    [JsonProperty("effects", Required = Required.DisallowNull)]
-    public List<AudioEffect> Effects { get; set; } = [];
+    /// <summary>
+    /// A list of routes defined by your audio pack.
+    /// </summary>
+    [JsonProperty("routes", Required = Required.DisallowNull)]
+    public List<Route> Routes { get; set; } = [];
 
     public static AudioPackConfig ReadJSON(Stream stream)
     {
+        List<string> warnings = [];
+
         var reader = new StreamReader(stream);
-        return JsonConvert.DeserializeObject<AudioPackConfig>(reader.ReadToEnd());
+        var data = JsonConvert.DeserializeObject<AudioPackConfig>(reader.ReadToEnd(), new JsonSerializerSettings()
+        {
+            MissingMemberHandling = MissingMemberHandling.Error,
+            Error = (object obj, Newtonsoft.Json.Serialization.ErrorEventArgs e) =>
+            {
+                if (e.ErrorContext.Error is JsonException exception)
+                {
+                    if (exception.Message.Contains("Could not find member"))
+                    {
+                        warnings.Add(exception.Message);
+                        e.ErrorContext.Handled = true;
+                    }
+                }
+            }
+        });
+
+        foreach (var warning in warnings)
+        {
+            Logging.LogWarning(warning);
+        }
+
+        return data;
     }
 
-    public static AudioPackConfig ConvertFromRoutes(RouteConfig routes)
+    public static AudioPackConfig ConvertFromRoutes(RouteConfig routeConfig)
     {
-        List<ClipReplacement> replacedClips = [];
+        List<Route> routes = [];
 
-        foreach (var route in routes.ReplacedClips)
+        foreach (var route in routeConfig.ReplacedClips)
         {
-            foreach (var replacement in route.Value)
+            routes.Add(new()
             {
-                replacedClips.Add(new()
+                OriginalClips = [route.Key],
+                ReplacementClips = route.Value.Select(x => new Route.ClipSelection()
                 {
-                    Original = route.Key,
-                    Target = replacement.Name,
-                    RandomWeight = replacement.RandomWeight,
-                });
-            }
+                    Name = x.Name,
+                    Weight = x.RandomWeight,
+                }).ToList()
+            });
         }
 
         return new AudioPackConfig
         {
-            CustomClips = routes.ReplacedClips
+            CustomClips = routeConfig.ReplacedClips
                 .SelectMany(x => x.Value)
+                .Select(x => x.Name)
+                .Distinct()
                 .Select(x => new AudioClipData()
                 {
-                    Name = x.Name
+                    Name = x,
+                    Path = x,
+                    IgnoreClipExtension = true
                 })
                 .ToList(),
-            Replacements = replacedClips
+            Routes = routes
         };
     }
 

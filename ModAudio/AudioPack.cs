@@ -7,12 +7,18 @@ public class AudioPack
 {
     public string PackPath { get; set; } = "???";
     public bool Enabled { get; set; } = false; // Must be enabled before use
+    public bool OverrideModeEnabled { get; set; } = false;
 
     public AudioPackConfig Config { get; set; } = new();
 
     public Dictionary<string, Func<AudioClip>> DelayedLoadClips { get; } = [];
     public Dictionary<string, AudioClip> LoadedClips { get; } = [];
-    public Dictionary<string, List<ClipReplacement>> Replacements { get; } = [];
+
+    public bool IsUserPack()
+    {
+        return PackPath.StartsWith(ModAudio.Plugin.ModAudioConfigFolder) ||
+            PackPath.StartsWith(ModAudio.Plugin.ModAudioPluginFolder);
+    }
 
     public bool TryGetReadyClip(string name, out AudioClip clip)
     {

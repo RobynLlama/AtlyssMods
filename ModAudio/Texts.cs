@@ -15,8 +15,8 @@ public static class Texts
 
     public const string ReloadTitle = "Reload audio packs";
 
-    public static string WeightClamped(float weight, AudioPackConfig.ClipReplacement replacement)
-        => $"Weight {weight} for {replacement.Original} => {replacement.Target} is outside the [{ModAudio.MinWeight}, {ModAudio.MaxWeight}] range and was clamped.";
+    public static string WeightClamped(float weight, AudioPack pack)
+        => $"Pack {pack.Config.Id} has a weight {weight} that is outside the [{ModAudio.MinWeight}, {ModAudio.MaxWeight}] range and will be clamped.";
 
     public static string EnablePackDescription(string displayName)
         => $"Set to true to enable {displayName}, false to disable it.";

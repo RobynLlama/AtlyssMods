@@ -66,6 +66,7 @@ public static class AudioPackLoader
         foreach (var audioPack in audioPacks)
         {
             FinalizePack(audioPack);
+            Logging.LogInfo($"Loaded pack {audioPack.Config.Id} | Routes {audioPack.Config.Routes.Count} | Loaded clips {audioPack.LoadedClips.Count} | Streamed clips {audioPack.DelayedLoadClips.Count}");
         }
 
         return audioPacks;
@@ -75,26 +76,33 @@ public static class AudioPackLoader
     {
         // Validate / normalize / remap stuff
 
-        foreach (var replacement in pack.Config.Replacements)
+        foreach (var route in pack.Config.Routes)
         {
-            if (!pack.Replacements.ContainsKey(replacement.Original))
+            var clampedWeight = Mathf.Clamp(route.ReplacementWeight, ModAudio.MinWeight, ModAudio.MaxWeight);
+
+            if (clampedWeight != route.ReplacementWeight)
+                Logging.LogWarning(Texts.WeightClamped(clampedWeight, pack));
+
+            route.ReplacementWeight = clampedWeight;
+
+            foreach (var selection in route.ReplacementClips)
             {
-                pack.Replacements[replacement.Original] = [];
+                clampedWeight = Mathf.Clamp(selection.Weight, ModAudio.MinWeight, ModAudio.MaxWeight);
+
+                if (clampedWeight != selection.Weight)
+                    Logging.LogWarning(Texts.WeightClamped(clampedWeight, pack));
+
+                selection.Weight = clampedWeight;
             }
 
-            pack.Replacements[replacement.Original].Add(replacement);
-        }
-
-        foreach (var replacement in pack.Replacements)
-        {
-            foreach (var branch in replacement.Value)
+            foreach (var selection in route.OverlayClips)
             {
-                var clampedWeight = Mathf.Clamp(branch.RandomWeight, ModAudio.MinWeight, ModAudio.MaxWeight);
+                clampedWeight = Mathf.Clamp(selection.Weight, ModAudio.MinWeight, ModAudio.MaxWeight);
 
-                if (clampedWeight != branch.RandomWeight)
-                    Logging.LogWarning(Texts.WeightClamped(clampedWeight, branch));
+                if (clampedWeight != selection.Weight)
+                    Logging.LogWarning(Texts.WeightClamped(clampedWeight, pack));
 
-                branch.RandomWeight = clampedWeight;
+                selection.Weight = clampedWeight;
             }
         }
     }
@@ -196,56 +204,7 @@ public static class AudioPackLoader
 
         var rootPath = Path.GetFullPath(Path.GetDirectoryName(path));
 
-        foreach (var clipData in config.CustomClips)
-        {
-            if (pack.LoadedClips.Any(x => x.Value.name == clipData.Name))
-            {
-                Logging.LogWarning(Texts.DuplicateClipId(clipData.Path, clipData.Name));
-                continue;
-            }
-
-            var clipPath = Path.GetFullPath(Path.Combine(rootPath, clipData.Path));
-
-            if (!clipPath.StartsWith(rootPath))
-            {
-                Logging.LogWarning(Texts.InvalidPackPath(clipData.Path, clipData.Name));
-                continue;
-            }
-
-            bool isAudioFile = AudioClipLoader.SupportedStreamExtensions.Any(clipPath.EndsWith) || AudioClipLoader.SupportedLoadExtensions.Any(clipPath.EndsWith);
-
-            if (!isAudioFile)
-                continue;
-
-            long fileSize = new FileInfo(clipPath).Length;
-            bool useStreaming = fileSize >= FileSizeLimitForLoading;
-
-            if (useStreaming && !AudioClipLoader.SupportedStreamExtensions.Any(clipPath.EndsWith))
-            {
-                Logging.LogWarning(Texts.AudioCannotBeStreamed(clipPath, fileSize));
-                useStreaming = false;
-            }
-
-            try
-            {
-                Logging.LogInfo($"Loading {(useStreaming ? "streamed " : "")}clip {clipData.Name} from {clipPath}", ModAudio.Plugin.LogAudioLoading);
-
-                if (useStreaming)
-                {
-                    // Opening a ton of streams at the start is not great, plus it adds a sizeable amount of load time if you have a lot of packs
-                    pack.DelayedLoadClips[clipData.Name] = () => AudioClipLoader.StreamFromFile(clipData.Name, clipPath, clipData.Volume);
-                }
-                else
-                {
-                    pack.LoadedClips[clipData.Name] = AudioClipLoader.LoadFromFile(clipData.Name, clipPath, clipData.Volume);
-                }
-            }
-            catch (Exception e)
-            {
-                Logging.LogWarning($"Failed to load {clipData.Name} from {clipPath}!");
-                Logging.LogWarning($"Exception: {e}");
-            }
-        }
+        LoadCustomClips(rootPath, pack, false);
 
         if (pack.Config.AudioPackSettings.AutoloadReplacementClips)
         {
@@ -290,18 +249,90 @@ public static class AudioPackLoader
         pack.Config.DisplayName = ConvertPathToDisplayName(path);
         pack.Config.Id = ConvertPathToId(path);
 
+        var rootPath = Path.GetFullPath(Path.GetDirectoryName(path));
+
+        LoadCustomClips(rootPath, pack, true);
         AutoLoadReplacementClipsFromPath(path, pack);
 
         return pack;
     }
 
-    private static void AutoLoadReplacementClipsFromPath(string path, AudioPack pack)
+    private static void LoadCustomClips(string rootPath, AudioPack pack, bool extensionless)
     {
-        foreach (var file in Directory.GetFiles(Path.GetDirectoryName(path)))
+        foreach (var clipData in pack.Config.CustomClips)
         {
-            bool isAudioFile = AudioClipLoader.SupportedStreamExtensions.Any(file.EndsWith) || AudioClipLoader.SupportedLoadExtensions.Any(file.EndsWith);
+            if (pack.LoadedClips.Any(x => x.Value.name == clipData.Name))
+            {
+                Logging.LogWarning(Texts.DuplicateClipId(clipData.Path, clipData.Name));
+                continue;
+            }
+
+            var clipPath = Path.GetFullPath(Path.Combine(rootPath, clipData.Path));
+
+            if (!clipPath.StartsWith(rootPath))
+            {
+                Logging.LogWarning(Texts.InvalidPackPath(clipData.Path, clipData.Name));
+                continue;
+            }
+
+            if (clipData.IgnoreClipExtension)
+            {
+                // Search for a file that is supported
+                foreach (var ext in AudioClipLoader.SupportedStreamExtensions)
+                {
+                    if (File.Exists(clipPath + ext))
+                    {
+                        clipPath = clipPath + ext;
+                        break;
+                    }
+                }
+            }
+
+            bool isAudioFile = AudioClipLoader.SupportedExtensions.Any(clipPath.EndsWith);
 
             if (!isAudioFile)
+                continue;
+
+            long fileSize = new FileInfo(clipPath).Length;
+            bool useStreaming = fileSize >= FileSizeLimitForLoading;
+
+            if (useStreaming && !AudioClipLoader.SupportedStreamExtensions.Any(clipPath.EndsWith))
+            {
+                Logging.LogWarning(Texts.AudioCannotBeStreamed(clipPath, fileSize));
+                useStreaming = false;
+            }
+
+            try
+            {
+                Logging.LogInfo($"Loading {(useStreaming ? "streamed " : "")}clip {clipData.Name} from {clipPath}", ModAudio.Plugin.LogAudioLoading);
+
+                if (useStreaming)
+                {
+                    // Opening a ton of streams at the start is not great, plus it adds a sizeable amount of load time if you have a lot of packs
+                    pack.DelayedLoadClips[clipData.Name] = () => AudioClipLoader.StreamFromFile(clipData.Name, clipPath, clipData.Volume);
+                }
+                else
+                {
+                    pack.LoadedClips[clipData.Name] = AudioClipLoader.LoadFromFile(clipData.Name, clipPath, clipData.Volume);
+                }
+            }
+            catch (Exception e)
+            {
+                Logging.LogWarning($"Failed to load {clipData.Name} from {clipPath}!");
+                Logging.LogWarning($"Exception: {e}");
+            }
+        }
+    }
+
+    private static void AutoLoadReplacementClipsFromPath(string path, AudioPack pack)
+    {
+        List<string> detectedClips = [];
+
+        foreach (var file in Directory.GetFiles(Path.GetDirectoryName(path)))
+        {
+            bool isAudioFile = AudioClipLoader.SupportedExtensions.Any(file.EndsWith);
+
+            if (!isAudioFile || !VanillaClipNames.IsKnownClip(Path.GetFileNameWithoutExtension(path)))
                 continue;
 
             long fileSize = new FileInfo(file).Length;
@@ -320,6 +351,8 @@ public static class AudioPackLoader
                 Logging.LogWarning(Texts.DuplicateClipSkipped(file, name));
                 continue;
             }
+
+            detectedClips.Add(name);
 
             try
             {
@@ -343,13 +376,14 @@ public static class AudioPackLoader
         }
 
         // Add implicit routes
-        foreach (var clip in pack.LoadedClips)
+        foreach (var clip in detectedClips)
         {
-            pack.Config.Replacements.Add(new()
+            pack.Config.Routes.Add(new()
             {
-                Original = clip.Key,
-                Target = clip.Key,
-                RandomWeight = 1f
+                OriginalClips = [clip],
+                ReplacementClips = [new AudioPackConfig.Route.ClipSelection() {
+                    Name = clip,
+                }],
             });
         }
     }

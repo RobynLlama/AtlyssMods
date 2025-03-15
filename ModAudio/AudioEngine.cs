@@ -19,12 +19,11 @@ internal static class AudioEngine
         public AudioClip AppliedClip;
 
         // Flags
-        public readonly bool Touched => EffectsApplied || Rerouted;
-        public bool EffectsApplied;
-        public bool Rerouted;
-        public bool PlayAudioEventsApplied;
+        public bool JustRouted;
+        public bool DisableRouting;
         public bool IsOneShotSource;
-        public bool ProcessedOnStart;
+        public bool IsOverlay;
+        public bool JustUsedDefaultClip;
 
         // Misc
         public AudioSource OneShotOrigin;
@@ -39,10 +38,88 @@ internal static class AudioEngine
     public static List<AudioPack> AudioPacks { get; } = [];
     public static IEnumerable<AudioPack> EnabledPacks => AudioPacks.Where(x => x.Enabled);
 
-    private static bool IsUserPack(AudioPack pack)
+    private static AudioClip EmptyClip
     {
-        return pack.PackPath.StartsWith(ModAudio.Plugin.ModAudioConfigFolder) ||
-            pack.PackPath.StartsWith(ModAudio.Plugin.ModAudioPluginFolder);
+        get
+        {
+            if (_emptyClip == null)
+            {
+                _emptyClip = AudioClip.Create("___nothing___", 256, 1, 44100, false);
+                _emptyClip.SetData(new float[256], 0);
+            }
+
+            return _emptyClip;
+        }
+    }
+    private static AudioClip _emptyClip;
+
+    private static bool IsValidTarget(AudioSource source, AudioPackConfig.Route route)
+    {
+        var trackedData = TrackedSources[source];
+
+        var originalClipName = trackedData.Clip?.name;
+        bool matchesOriginalClip = false;
+
+        if (originalClipName != null)
+        {
+            for (int i = 0; i < route.OriginalClips.Count; i++)
+            {
+                if (route.OriginalClips[i] == originalClipName)
+                {
+                    matchesOriginalClip = true;
+                    break;
+                }
+            }
+        }
+
+        if (!matchesOriginalClip)
+            return false;
+
+        if (route.FilterBySources.Count > 0)
+        {
+            var sourceName = source.name;
+            var matchesSource = false;
+
+            for (int i = 0; i < route.FilterBySources.Count; i++)
+            {
+                if (route.FilterBySources[i] == sourceName)
+                {
+                    matchesSource = true;
+                    break;
+                }
+            }
+
+            if (!matchesSource)
+                return false;
+        }
+
+        if (route.FilterByObject.Count > 0)
+        {
+            var transform = source.transform;
+
+            var matchesObject = false;
+
+            while (transform != null)
+            {
+                var gameObjectName = transform.gameObject.name;
+
+                for (int i = 0; i < route.FilterByObject.Count; i++)
+                {
+                    if (route.FilterByObject[i] == gameObjectName)
+                    {
+                        matchesObject = true;
+                        break;
+                    }
+                }
+
+                transform = transform.parent;
+            }
+
+            if (!matchesObject)
+                return false;
+        }
+
+        return true;
     }
 
     public static void HardReload() => Reload(hardReload: true);
@@ -75,16 +152,25 @@ internal static class AudioEngine
         }
 
         // Restore previous state
+        Dictionary<AudioSource, bool> wasPlayingPreviously = [];
+
+        foreach (var audio in UnityEngine.Object.FindObjectsOfType<AudioSource>(true))
+        {
+            wasPlayingPreviously[audio] = audio.isPlaying;
+
+            if (wasPlayingPreviously[audio])
+            {
+                audio.Stop();
+            }
+        }
+
         foreach (var source in TrackedSources)
         {
             SourceCache.Push(source.Key);
 
-            if (source.Value.Touched)
-            {
-                source.Key.clip = source.Value.Clip;
-                source.Key.volume = source.Value.Volume;
-                source.Key.pitch = source.Value.Pitch;
-            }
+            source.Key.clip = source.Value.Clip;
+            source.Key.volume = source.Value.Volume;
+            source.Key.pitch = source.Value.Pitch;
         }
 
         TrackedSources.Clear();
@@ -95,18 +181,14 @@ internal static class AudioEngine
 
             AudioPacks.Clear();
             AudioPacks.AddRange(AudioPackLoader.LoadAudioPacks());
+            ModAudio.Plugin.InitializePackConfiguration(); // TODO I wish ModAudio plugin ref wouldn't be here
         }
 
         // Restart audio
         foreach (var audio in UnityEngine.Object.FindObjectsOfType<AudioSource>(true))
         {
-            //AudioPlayed(audio);
-
-            if (audio.isPlaying)
-            {
-                audio.Stop();
+            if (wasPlayingPreviously[audio])
                 audio.Play();
-            }
         }
 
         Logging.LogInfo("Done with reload!");
@@ -183,16 +265,25 @@ internal static class AudioEngine
         }
 
         // Check for any changes in tracked sources' clips
+
         foreach (var source in TrackedSources)
         {
             if (source.Key.clip != source.Value.AppliedClip)
+            {
                 SourceCache.Push(source.Key);
+
+                // Need to untrack source
+
+                source.Key.clip = source.Value.Clip;
+                source.Key.volume = source.Value.Volume;
+                source.Key.pitch = source.Value.Pitch;
+            }
         }
 
         while (SourceCache.Count > 0)
         {
             var source = SourceCache.Pop();
-            TrackedSources[source] = TrackedSources[source] with { Clip = source.clip, Rerouted = false };
+            TrackedSources.Remove(source);
         }
     }
 
@@ -214,7 +305,7 @@ internal static class AudioEngine
     {
         var oneShotSource = source.gameObject.AddComponent<AudioSource>();
 
-        oneShotSource.name = "modaudio_oneshot";
+        oneShotSource.name = "oneshot";
 
         oneShotSource.volume = source.volume;
         oneShotSource.pitch = source.pitch;
@@ -282,256 +373,242 @@ internal static class AudioEngine
         return false;
     }
 
-    public static bool AudioPlayed(AudioSource source)
+    private static void LogAudio(AudioSource source)
     {
-        bool processed = TrackedSources.TryGetValue(source, out var state) && state.ProcessedOnStart;
-        bool restarted = false;
+        var originalClipName = TrackedSources[source].Clip?.name ?? "(null)";
+        var currentClipName = source.clip?.name ?? "(null)";
+        var clipChanged = TrackedSources[source].Clip != source.clip;
 
-        if (!processed)
+        if (TrackedSources[source].JustUsedDefaultClip)
         {
-            TrackSource(source);
-            TrackedSources[source] = TrackedSources[source] with { ProcessedOnStart = true };
-
-            Reroute(source);
-            ApplyEffects(source);
-            ApplyTriggers(source);
-
-            if (source.isPlaying)
-            {
-                restarted = true;
-                source.Stop();
-                source.Play();
-            }
+            clipChanged = true;
+            currentClipName = "___default___";
         }
 
-        // If it has been restarted, then Play() has been called again
-        // This means that we need to skip logging and running the original method for this call
-        if (!restarted)
-        {
-            var originalClipName = TrackedSources[source].Clip?.name ?? "(null)";
-            var currentClipName = source.clip?.name ?? "(null)";
-            bool rerouted = TrackedSources[source].Rerouted;
+        var originalVolume = TrackedSources[source].Volume;
+        var currentVolume = source.volume;
 
-            Logging.LogInfo($"Clip {originalClipName} ({source.name}){(rerouted ? $" => {currentClipName}" : "")}", ModAudio.Plugin.LogPlayedAudio);
-        }
+        var originalPitch = TrackedSources[source].Pitch;
+        var currentPitch = source.pitch;
 
-        return !restarted;
+        var clipDisplay = clipChanged ? $"{originalClipName} > {currentClipName}" : originalClipName;
+        var volumeDisplay = originalVolume != currentVolume ? $"{originalVolume:F2} > {currentVolume:F2}" : $"{originalVolume:F2}";
+        var pitchDisplay = originalPitch != currentPitch ? $"{originalPitch:F2} > {currentPitch:F2}" : $"{originalPitch:F2}";
+
+        var messageDisplay = $"Clp {clipDisplay} | Src {source.name} | Vol {volumeDisplay} | Pit {pitchDisplay}";
+
+        if (TrackedSources[source].IsOverlay)
+            messageDisplay += " (overlay)";
+
+        Logging.LogInfo(messageDisplay, ModAudio.Plugin.LogPlayedAudio);
     }
 
-    private static void ApplyTriggers(AudioSource source)
+    public static bool AudioPlayed(AudioSource source)
     {
-        if (TrackedSources.TryGetValue(source, out var state) && state.PlayAudioEventsApplied)
-            return;
+        var wasPlaying = source.isPlaying;
 
-        TrackedSources[source] = TrackedSources[source] with { PlayAudioEventsApplied = true };
+        if (!Route(source))
+        {
+            LogAudio(source);
+            return true;
+        }
+
+        TrackedSources[source] = TrackedSources[source] with { JustRouted = false };
+
+        bool requiresRestart = wasPlaying && !source.isPlaying;
+
+        if (requiresRestart)
+        {
+            source.Play();
+        }
+        else
+        {
+            LogAudio(source);
+        }
+
+        // If a restart was required, then we already played the sound manually again, so let's skip the original
+        return !requiresRestart;
+    }
+
+    private static bool Route(AudioSource source)
+    {
+        TrackSource(source);
+        var trackedData = TrackedSources[source];
+
+        if (trackedData.JustRouted || trackedData.DisableRouting)
+            return false;
+
+        TrackedSources[source] = TrackedSources[source] with { JustRouted = true, JustUsedDefaultClip = false };
+
+        // Get a replacement from routes
+
+        List<(AudioPack, AudioPackConfig.Route)> replacements = [];
 
         foreach (var pack in EnabledPacks)
         {
-            foreach (var trigger in pack.Config.PlayAudioEvents)
+            foreach (var route in pack.Config.Routes)
             {
-                // TODO: Triggers that don't specify any targets or clips should be considered as invalid
+                if (IsValidTarget(source, route))
+                    replacements.Add((pack, route));
+            }
+        }
 
-                if (trigger.ClipSelection.Count == 0)
-                    continue;
+        (AudioPack Pack, AudioPackConfig.Route Route) replacementRoute = (null, null);
 
-                if (trigger.TargetClips.Count > 0 && !trigger.TargetClips.Contains(source.clip?.name))
-                    continue;
+        if (replacements.Count > 0)
+        {
+            replacementRoute = SelectRandomWeighted(replacements);
 
-                if (trigger.TargetSources.Count > 0 && !trigger.TargetSources.Contains(source.name))
-                    continue;
+            // Apply overall effects
 
-                if (RNG.NextDouble() > trigger.TriggerChance)
-                    continue;
+            if (replacementRoute.Route.RelativeReplacementEffects)
+            {
+                source.volume = trackedData.Volume * replacementRoute.Route.Volume;
+                source.pitch = trackedData.Pitch * replacementRoute.Route.Pitch;
+            }
+            else
+            {
+                source.volume = replacementRoute.Route.Volume;
+                source.pitch = replacementRoute.Route.Pitch;
+            }
 
-                float totalWeight = 0f;
+            // Apply replacement if needed
 
-                foreach (var clip in trigger.ClipSelection)
+            if (replacementRoute.Route.ReplacementClips.Count > 0)
+            {
+                var randomSelection = SelectRandomWeighted(replacementRoute.Route.ReplacementClips);
+
+                AudioClip destinationClip;
+
+                if (randomSelection.Name == "___default___")
                 {
-                    totalWeight += clip.RandomWeight;
+                    destinationClip = TrackedSources[source].Clip;
+                    TrackedSources[source] = TrackedSources[source] with { JustUsedDefaultClip = true };
                 }
-
-                float randomValue = (float)(RNG.NextDouble() * totalWeight);
-                var selectedClipData = trigger.ClipSelection[0]; // Use source as default if rolling doesn't succeed for some reason
-
-                foreach (var clip in trigger.ClipSelection)
+                else if (randomSelection.Name == "___nothing___")
                 {
-                    if (randomValue <= 0)
-                        break;
-
-                    randomValue -= clip.RandomWeight;
-                    selectedClipData = clip;
-                }
-
-                if (pack.TryGetReadyClip(selectedClipData.ClipName, out var selectedClip))
-                {
-                    var oneShotSource = CreateOneShotFromSource(source);
-
-                    oneShotSource.pitch = selectedClipData.Pitch;
-                    oneShotSource.volume = selectedClipData.Volume;
-                    oneShotSource.clip = selectedClip;
-
-                    TrackedSources[oneShotSource] = TrackedSources[oneShotSource] with { 
-                        PlayAudioEventsApplied = true,
-                        Pitch = oneShotSource.pitch,
-                        Volume = oneShotSource.volume,
-                        Clip = oneShotSource.clip
-                    };
-
-                    oneShotSource.Play();
-
-                    Logging.LogInfo($"Triggered clip {oneShotSource.clip?.name ?? "(null)"} on {source.clip?.name} ({source.name}).", ModAudio.Plugin.LogAudioEffects);
+                    destinationClip = EmptyClip;
                 }
                 else
                 {
-                    Logging.LogWarning($"TODO Couldn't get clip {selectedClipData} to play for audio event!");
+                    replacementRoute.Pack.TryGetReadyClip(randomSelection.Name, out destinationClip);
+                }
+
+                if (destinationClip != null)
+                {
+                    TrackedSources[source] = TrackedSources[source] with { AppliedClip = destinationClip, JustRouted = true };
+
+                    source.volume *= randomSelection.Volume;
+                    source.pitch *= randomSelection.Pitch;
+
+                    if (source.isPlaying)
+                        source.Stop();
+
+                    source.clip = destinationClip;
+                }
+                else
+                {
+                    Logging.LogWarning("TODO Failed to apply clip.");
                 }
             }
         }
-    }
 
-    private static void ApplyEffects(AudioSource source)
-    {
-        if (TrackedSources.TryGetValue(source, out var state) && state.EffectsApplied)
-            return;
-
-        TrackedSources[source] = TrackedSources[source] with { EffectsApplied = true };
-
-        bool effectApplied = false; // For now this means there's at most one effect per clip
+        List<(AudioPack Pack, AudioPackConfig.Route Route)> overlays = [];
 
         foreach (var pack in EnabledPacks)
         {
-            foreach (var effect in pack.Config.Effects)
+            foreach (var route in pack.Config.Routes)
             {
-                // TODO: Effects that don't specify any targets or modifiers should be considered as invalid
+                if (route.OverlayClips.Count > 0 && IsValidTarget(source, route) && (!route.LinkOverlayAndReplacement || replacementRoute.Route == route)) 
+                    overlays.Add((pack, route));
+            }
+        }
 
-                if (effect.TargetClips.Count > 0 && !effect.TargetClips.Contains(source.clip?.name))
+        if (overlays.Count > 0)
+        {
+            foreach (var (Pack, Route) in overlays)
+            {
+                var randomSelection = SelectRandomWeighted(Route.OverlayClips);
+
+                if (randomSelection.Name == "___nothing___")
                     continue;
 
-                if (effect.TargetSources.Count > 0 && !effect.TargetSources.Contains(source.name))
-                    continue;
-
-                if (effect.Volume.HasValue)
+                if (Pack.TryGetReadyClip(randomSelection.Name, out var selectedClip))
                 {
-                    source.volume *= effect.Volume.Value;
-                }
+                    var oneShotSource = CreateOneShotFromSource(source);
+                    oneShotSource.clip = selectedClip;
 
-                if (effect.Pitch.HasValue)
-                {
-                    source.pitch *= effect.Pitch.Value;
-                }
-
-                Logging.LogInfo($"Applied effects to clip {source.clip?.name ?? "(null)"}: volume {effect.Volume.GetValueOrDefault(1)}, pitch {effect.Pitch.GetValueOrDefault(1)}", ModAudio.Plugin.LogAudioEffects);
-                effectApplied = true;
-                break;
-            }
-
-            if (effectApplied)
-                break;
-        }
-
-        return;
-    }
-
-    private static void Reroute(AudioSource source)
-    {
-        if (TrackedSources.TryGetValue(source, out var state) && state.Rerouted)
-            return;
-
-        var originalClip = TrackedSources[source].Clip;
-
-        if (TryGetReplacement(originalClip, out var destination))
-        {
-            if (source.clip.name == destination.name)
-                return; // Same clip in audio source at the moment, don't need to do operations on it?
-
-            TrackedSources[source] = TrackedSources[source] with { AppliedClip = destination, Rerouted = true };
-
-            source.clip = destination;
-
-            Logging.LogInfo($"Replaced clip {originalClip.name} with {destination.name}.", ModAudio.Plugin.LogCustomAudio);
-        }
-    }
-
-    private static bool TryGetReplacement(AudioClip source, out AudioClip destination)
-    {
-        if (source?.name == null)
-        {
-            destination = null;
-            return false;
-        }
-
-        float totalWeight = 0;
-
-        foreach (var pack in EnabledPacks.Where(IsUserPack))
-        {
-            if (pack.Replacements.TryGetValue(source.name, out var replacementData))
-            {
-                foreach (var branch in replacementData)
-                {
-                    totalWeight += branch.RandomWeight;
-                }
-            }
-        }
-
-        foreach (var pack in EnabledPacks.Where(x => !IsUserPack(x)))
-        {
-            if (pack.Replacements.TryGetValue(source.name, out var replacementData))
-            {
-                foreach (var branch in replacementData)
-                {
-                    totalWeight += branch.RandomWeight;
-                }
-            }
-        }
-
-        float randomValue = (float)(RNG.NextDouble() * totalWeight);
-        AudioClip selectedClip = source; // Use source as default if rolling doesn't succeed for some reason
-
-        foreach (var pack in EnabledPacks.Where(IsUserPack))
-        {
-            if (randomValue <= 0)
-                break;
-
-            if (pack.Replacements.TryGetValue(source.name, out var replacementData))
-            {
-                foreach (var branch in replacementData)
-                {
-                    if (branch.Target == ModAudio.DefaultClipIdentifier || !pack.TryGetReadyClip(branch.Target, out selectedClip))
+                    if (Route.RelativeOverlayEffects)
                     {
-                        selectedClip = source;
+                        oneShotSource.volume = trackedData.Volume * randomSelection.Volume;
+                        oneShotSource.pitch = trackedData.Pitch * randomSelection.Pitch;
+                    }
+                    else
+                    {
+                        oneShotSource.volume = randomSelection.Volume;
+                        oneShotSource.pitch = randomSelection.Pitch;
                     }
 
-                    randomValue -= branch.RandomWeight;
-
-                    if (randomValue <= 0)
-                        break;
-                }
-            }
-        }
-
-        foreach (var pack in EnabledPacks.Where(x => !IsUserPack(x)))
-        {
-            if (randomValue <= 0)
-                break;
-
-            if (pack.Replacements.TryGetValue(source.name, out var replacementData))
-            {
-                foreach (var branch in replacementData)
-                {
-                    if (branch.Target == ModAudio.DefaultClipIdentifier || !pack.TryGetReadyClip(branch.Target, out selectedClip))
+                    TrackedSources[oneShotSource] = TrackedSources[oneShotSource] with
                     {
-                        selectedClip = source;
-                    }
+                        Pitch = oneShotSource.pitch,
+                        Volume = oneShotSource.volume,
+                        Clip = oneShotSource.clip,
+                        IsOverlay = true,
+                        DisableRouting = true
+                    };
 
-                    randomValue -= branch.RandomWeight;
-
-                    if (randomValue <= 0)
-                        break;
+                    oneShotSource.Play();
+                }
+                else
+                {
+                    Logging.LogWarning($"TODO Couldn't get clip {randomSelection.Name} to play for audio event!");
                 }
             }
         }
 
-        destination = selectedClip;
         return true;
+    }
+
+    private static (AudioPack Pack, AudioPackConfig.Route Route) SelectRandomWeighted(List<(AudioPack Pack, AudioPackConfig.Route Route)> routes)
+    {
+        var totalWeight = 0.0;
+
+        for (int i = 0; i < routes.Count; i++)
+            totalWeight += routes[i].Route.ReplacementWeight;
+        
+        var selectedIndex = -1;
+
+        var randomValue = RNG.NextDouble() * totalWeight;
+
+        do
+        {
+            selectedIndex++;
+            randomValue -= routes[selectedIndex].Route.ReplacementWeight;
+        }
+        while (randomValue >= 0.0);
+
+        return routes[selectedIndex];
+    }
+
+    private static AudioPackConfig.Route.ClipSelection SelectRandomWeighted(List<AudioPackConfig.Route.ClipSelection> selections)
+    {
+        var totalWeight = 0.0;
+
+        for (int i = 0; i < selections.Count; i++)
+            totalWeight += selections[i].Weight;
+
+        var selectedIndex = -1;
+
+        var randomValue = RNG.NextDouble() * totalWeight;
+
+        do
+        {
+            selectedIndex++;
+            randomValue -= selections[selectedIndex].Weight;
+        }
+        while (randomValue >= 0.0);
+
+        return selections[selectedIndex];
     }
 }

@@ -22,6 +22,8 @@ public static class AudioClipLoader
         ".mp3"
     ];
 
+    public static readonly string[] SupportedExtensions = [.. SupportedStreamExtensions, .. SupportedLoadExtensions];
+
     /// <summary>
     /// Loads an audio clip in its entirety from the disk.
     /// </summary>

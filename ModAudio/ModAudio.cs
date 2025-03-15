@@ -111,7 +111,7 @@ public class ModAudio : BaseUnityPlugin
         }
     }
 
-    private void InitializePackConfiguration()
+    internal void InitializePackConfiguration()
     {
         bool addedHeader = false;
 
@@ -183,7 +183,6 @@ public class ModAudio : BaseUnityPlugin
             CheckForObsoleteStuff();
 
             AudioEngine.HardReload();
-            InitializePackConfiguration();
         }
 
         AudioEngine.Update();
