@@ -12,21 +12,30 @@ ModAudio loads custom audio and routing information from any custom mods you hav
 
 It uses a combination of audio files and the `__routes.txt` configuration file located in the audio folder of a mod.
 
-It also loads custom audio from its own folder (`BepInEx/plugins/Marioalexsan-ModAudio/audio`). You can place your custom audio in here if you don't want to make a standalone mod.
+It also loads custom audio from its own config folder (`BepInEx/config/Marioalexsan.ModAudio_UserAudioPack/audio`). 
+You can place your custom audio in here if you don't want to make a standalone mod. The folder is normally created when you load the mod for the first time.
 
 # Where is this audio folder located???
 
-When using r2modman, you can find BepInEx in your profile folder for ATLYSS ("Settings" button, first option in the list). For example: `C:\Users\USERNAME\AppData\Roaming\r2modmanPlus-local\ATLYSS\profiles\Default`.
+When using r2modman, you can find BepInEx in your profile folder for ATLYSS ("Settings" button, "Browse profile folder"). For example: `C:\Users\USERNAME\AppData\Roaming\r2modmanPlus-local\ATLYSS\profiles\Default`.
 
 If you've installed BepInEx manually, then go to Steam's ATLYSS install path. For example: `C:\Program Files (x86)\Steam\steamapps\common\ATLYSS`.
 
-From the r2modman profile or the Steam install, navigate to `BepInEx/plugins/Marioalexsan-ModAudio/audio`, or your custom mod's audio folder.
+From the r2modman profile or the Steam install, navigate to your downloaded audio pack's `BepInEx/plugins/AUDIOPACKNAME/audio` folder.
+
+For custom user packs, you can use the `BepInEx/config/Marioalexsan.ModAudio_UserAudioPack/audio` folder.
 
 # Audio mod example
 
-*Note: There are already plenty of audio mods created that use ModAudio on Thunderstore. If something in here is confusing, you can do "Manual download" for those audio mods to take a look at how they package their assets.*
+Note: There are already plenty of audio mods created that use ModAudio on Thunderstore. If something in here is confusing, you can do "Manual download" for those audio mods to take a look at how they package their assets.
 
-Here's an example of an audio mod that uses all of the features combined:
+You can also use the following templates as examples:
+- [Template Mod by RockOn](https://thunderstore.io/c/atlyss/p/RockOn/MusicModTemplate/) on Thunderstore, that shows you how to use the basic route format
+- [ModAudioTemplate](https://github.com/Marioalexsan/AtlyssMods/ModAudioTemplate) on GitHub, that shows you the full format available
+
+## Basic audio pack format (v1.1.0)
+
+Here's an example of a simple audio pack that replaces in-game audio using the basic format:
 
 **mod folder structure under BepInEx/plugins**
 ```
@@ -46,7 +55,7 @@ ModFolder
 ```
 # Empty lines and lines that start with a hashtag are ignored
 
-# Musics
+# Musicss
 _mu_wonton5 = darkest_dungeon_combat
 _mu_ekca = risk_of_rain_2_boss
 _mu_selee = team_fortress_2_loadout
@@ -70,15 +79,71 @@ This audio mod will do the following:
   - `cod_hitsound_03.mp3` will play with a `0.5 / 5 * 100% = 12.5%` chance
   - the original, unmodified sound clip will play with a `2 / 4 * 100% = 50%` chance
 
-# How does this work???
+## Advanced audio pack format (v2.0.0)
+
+The new format for __routes.txt in 2.0.0 uses a different syntax that gives you access to new features, such as overlays, effects, and other stuff.
+
+You can check out the [ModAudioTemplate](https://github.com/Marioalexsan/AtlyssMods/ModAudioTemplate) example audio pack for reference.
+
+The format is documented in greater detail within the [__routes.txt](https://github.com/Marioalexsan/AtlyssMods/ModAudioTemplate/audio/__routes.txt) file from it.
+
+# Packaging your audio mods for Thunderstore / r2modman
+
+When packaging your mods for Thunderstore / r2modman, you need to put your `audio` folder that contains your audio and `__routes.txt` under the `plugins` folder in the zip.
+
+This is to make sure that r2modman won't flatten all of your files into the root directory, which ***will*** cause issues.
+
+Here's an example of how your ZIP package should look like:
+
+***yourmod.zip***
+```
+|- manifest.json
+|- README.md
+|- CHANGELOG.md
+|- icon.png
+|- plugins
+   |- audio
+      |- __routes.txt
+      |- _mu_flyby.mp3
+      |- someaudio.ogg
+      |- someotheraudio.wav
+```
+
+r2modman will take all of your content from the ZIP's `plugins` and put it as-is in the mod folder, thus preserving the folder structure that ModAudio wants.
+
+Also, your manifest.json should have ModAudio listed as a dependency, with the latest version being preferable:
+
+***manifest.json***
+```
+{
+  "name": "YourModName",
+  "description": "Cool sounds and stuff",
+  "version_number": "1.0.0",
+  "dependencies": [
+    "BepInEx-BepInExPack-5.4.2100",
+    "Marioalexsan-ModAudio-2.0.0"
+  ],
+  "website_url": "https://github.com/Marioalexsan/AtlyssMods"
+}
+```
+
+*Do not include any of the DLLs from ModAudio in your own mod.* It's not needed, and it might cause issues with loading. You just need the dependency string in manifest.json.
+
+Additionally, it would be nice if you would make a cool `icon.png` for your mod and a `README.md` file with details about your audio pack.
+
+You should also add some contact information of some kind in the `README.md` for people to send in feedback or bug reports.
+
+# Additional details about the basic format (1.1.0)
 
 ## Direct replacement
 
-You can replace audio clips directly if the file name matches the clip name.
+You can replace audio clips directly if the file name matches the clip name within the game.
 
 1. Choose a clip you want to replace (for example, `_mu_wonton5` - Crescent Grove's action music).
 2. Take your custom audio, and rename it so that it has the same name as the clip (for example, `coolmusic.mp3` -> `_mu_wonton5.mp3`).
 3. Place the audio file in the `audio` folder.
+
+Think of it as an implicit `sourceClip = sourceClip` route.
 
 ## Reroute the clip in __routes.txt
 
@@ -120,49 +185,11 @@ _mu_wonton5 = _mu_wonton5_remix / 0.2
 
 This will play the default boss music with an 80% chance, and a remixed version with a 20% chance.
 
-# Packaging your audio mods for Thunderstore / r2modman
+## This __routes.txt format sucks! Can I just use JSON or something?
 
-When packaging your mods for Thunderstore / r2modman, you need to put your `audio` folder that contains your audio and `__routes.txt` under the `plugins` folder in the zip.
+Yeah! You can specify a `modaudio.config.json` file instead of a `__routes.txt` to customize the audio packs using JSON.
 
-This is to make sure that r2modman won't flatten all of your files into the root directory, which might cause issues.
-
-Here's an example of how your ZIP package should look like:
-
-***yourmod.zip***
-```
-|- manifest.json
-|- README.md
-|- CHANGELOG.md
-|- icon.png
-|- plugins
-   |- audio
-      |- __routes.txt
-      |- _mu_flyby.mp3
-      |- someaudio.ogg
-      |- someotheraudio.wav
-```
-
-r2modman will take all of your content from the ZIP's `plugins` and put it as-is in the mod folder, thus preserving the folder structure that ModAudio wants.
-
-Also, your manifest.json should have ModAudio listed as a dependency, with the latest version being preferable:
-
-***manifest.json***
-```
-{
-  "name": "YourModName",
-  "description": "Cool sounds and stuff",
-  "version_number": "1.0.0",
-  "dependencies": [
-    "BepInEx-BepInExPack-5.4.2100",
-    "Marioalexsan-ModAudio-1.1.0"
-  ],
-  "website_url": "https://github.com/Marioalexsan/AtlyssMods"
-}
-```
-
-*Do not include the ModAudio DLL in your own mod.* It's not needed, and it might cause issues with loading. You just need the dependency string in manifest.json.
-
-# Advanced usage
+The feature set available for JSON configs is slightly bigger, and you can use [this file](https://github.com/Marioalexsan/AtlyssMods/blob/main/ModAudio/AudioPackConfig.cs) as a reference for all of the fields that are available.
 
 ## Multiple audio mods
 
@@ -172,45 +199,23 @@ For example, if you have two mods that replace the Main Menu music, then each of
 
 If the first mod's replacement has a weight of 1, and the second one has a weight of two, then it will be a 33% / 67% chance split for either of them to play.
 
-## Custom audio folder location
+For mods with overlays, each of the mods will trigger overlays independently, so you might want to not install too many hitsound audio packs at once.
 
-If you are making a custom plugin and need to load audio information from a different folder, you can use the `ModAudio.LoadModAudio()` method.
+## Audio logging
 
-For example, this will tell ModAudio to load audio from `C:\\mycoolmusicpath` for your mod, instead of trying to read the `audio` folder next to the DLL.
-```cs
-[BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
-[BepInDependency("Marioalexsan.ModAudio")]
-public class MyCustomAudio : BaseUnityPlugin
-{
-    private void Awake()
-    {
-        Marioalexsan.ModAudio.ModAudio.Instance.LoadModAudio(this, "C:\\mycoolmusicpath");
-    }
-}
-```
+There are multiple options available for logging how audio packs are loaded and played. All of the options can be configured in `BepInEx/config/Marioalexsan.ModAudio.cfg` (generated on first load), or in Nessie's EasySettings.
 
-## Audio override
+- LogPackLoading - logs details about loaded packs - default: true
+- LogAudioPlayed - logs details about audio that is played in-game - default: true
+- UseMaxDistanceForLogging - if true, only audio that is within a certain distance from the player will be logged - default: false
+- MaxDistanceForLogging - distance from player to log audio within, in units. For reference, Angela is about 12 units or so in height - default: 32, min: 32, max: 2048
 
-In the mod's configuration file (`BepInEx/config/Marioalexsan.ModAudio.cfg`), you can set `OverrideCustomAudio` to `true` to enable audio overrides.
-
-This will cause **anything** you place under `BepInEx/plugins/ModAudio/audio` to completely override what any other mods are trying to do.
-
-For example, if there is a mod that replaces a lot of sounds, but you want to keep the main menu music intact, you can enable that option and specify this in `__routes.txt`:
-
-```
-_mu_flyby = ___default___
-```
-
-This will make it play the vanilla music every time, ignoring whatever other mods have defined.
-
-## Extensive logging
-
-Set `ExtensiveLogging` to `true` in the configuration file to have ModAudio log sounds played, sounds replaced, and lots of other debug information.
-
-This is spammy, but it can be useful to debug what is happening with your mods, or find out what sounds are being played in the world.
-
-The logging is done to BepInEx's console and `BepInEx/LogOutput.log`.
+For each audio pack loaded, there is also an option to enable or disable that pack.
 
 # Mod Compatibility
 
-This mod version targets ATLYSS v1.6.2b. Compatibility with other game versions is not guaranteed, especially for updates with major changes.
+ModAudio targets the following game versions and mods:
+- ATLYSS v1.6.2b
+- Nessie's EasySettings v1.1.3 (optional dependency used for configuration)
+
+Compatibility with other game versions and mods is not guaranteed, especially for updates with major changes.

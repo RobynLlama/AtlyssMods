@@ -108,7 +108,7 @@ public class AudioPackConfig
         /// If false, overlays can play separately from the replacement.
         /// </summary>
         [JsonProperty("link_overlay_and_replacement", Required = Required.DisallowNull)]
-        public bool LinkOverlayAndReplacement { get; set; } = false;
+        public bool LinkOverlayAndReplacement { get; set; } = true;
 
         /// <summary>
         /// If true, replacement effects (volume, pitch, etc.) are modifiers on top of the original source.
@@ -212,36 +212,33 @@ public class AudioPackConfig
 
     public static AudioPackConfig ConvertFromRoutes(RouteConfig routeConfig)
     {
-        List<Route> routes = [];
-
-        foreach (var route in routeConfig.ReplacedClips)
+        var config = new AudioPackConfig
         {
-            routes.Add(new()
-            {
-                OriginalClips = [route.Key],
-                ReplacementClips = route.Value.Select(x => new Route.ClipSelection()
-                {
-                    Name = x.Name,
-                    Weight = x.RandomWeight,
-                }).ToList()
-            });
-        }
-
-        return new AudioPackConfig
-        {
-            CustomClips = routeConfig.ReplacedClips
-                .SelectMany(x => x.Value)
+            CustomClips = routeConfig.Routes
+                .SelectMany(x => x.ReplacementClips.Concat(x.OverlayClips))
                 .Select(x => x.Name)
+                .Where(x => x != "___default___" && x != "___nothing___") // TODO: Move these magic strings to a constant
                 .Distinct()
                 .Select(x => new AudioClipData()
                 {
                     Name = x,
                     Path = x,
-                    IgnoreClipExtension = true
+                    IgnoreClipExtension = true,
+                    Volume = routeConfig.ClipVolumes.ContainsKey(x) ? routeConfig.ClipVolumes[x] : 1f
                 })
                 .ToList(),
-            Routes = routes
+            Routes = routeConfig.Routes,
+            Id = routeConfig.Id,
+            DisplayName = routeConfig.DisplayName,
         };
+
+        foreach (var clipVolume in routeConfig.ClipVolumes)
+        {
+            if (!config.CustomClips.Any(x => x.Name == clipVolume.Key))
+                Logging.LogWarning($"Couldn't find clip {clipVolume.Key} to set volume for.");
+        }
+
+        return config;
     }
 
     public static string GenerateSchema()

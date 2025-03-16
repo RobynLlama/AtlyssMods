@@ -11,6 +11,8 @@ public class AudioPack
 
     public AudioPackConfig Config { get; set; } = new();
 
+    public List<AudioClipLoader.IAudioStream> OpenStreams { get; } = []; // Only touch this if you plan on cleaning up the pack
+
     public Dictionary<string, Func<AudioClip>> DelayedLoadClips { get; } = [];
     public Dictionary<string, AudioClip> LoadedClips { get; } = [];
 

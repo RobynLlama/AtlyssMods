@@ -7,11 +7,29 @@ public static class Texts
     public const string LogAudioLoadingTitle = "Log audio pack loading";
     public const string LogAudioLoadingDescription = "True to enable logging when loading audio packs,  false to disable it.";
 
-    public const string LogCustomAudioTitle = "Log custom audio";
-    public const string LogCustomAudioDescription = "True to enable logging when audio is replaced with custom tracks, false to disable it.";
+    public const string LogAudioPlayedTitle = "Log audio played";
+    public const string LogAudioPlayedDescription = "True to enable console logging for audio played, false to disable it.";
 
-    public const string OverrideCustomAudioTitle = "Override custom audio";
-    public const string OverrideCustomAudioDescription = "If true, and the user audio pack in ModAudio's config has custom audio, that custom audio will override any custom audio for the same track coming from downloaded packs.";
+    public const string UseMaxDistanceForLoggingTitle = "Limit audio logged by distance";
+    public const string UseMaxDistanceForLoggingDescription = "True to log audio played only if it's within a certain range of the player, false to log all sounds.";
+
+    public const string MaxDistanceForLoggingTitle = "Max log distance";
+    public const string MaxDistanceForLoggingDescription = "The max distance in units from the player where audio will be logged (for reference, 12 units ~ Angela Flux's height).";
+
+    public const string LogAmbienceTitle = "Log ambience audio";
+    public const string LogAmbienceDescription = "True to log audio that's part of the ambience group, false to skip it.";
+
+    public const string LogGameTitle = "Log game audio";
+    public const string LogGameDescription = "True to log audio that's part of the game group, false to skip it.";
+
+    public const string LogGUITitle = "Log GUI audio";
+    public const string LogGUIDescription = "True to log audio that's part of the GUI group, false to skip it.";
+
+    public const string LogMusicTitle = "Log music audio";
+    public const string LogMusicDescription = "True to log audio that's part of the music group, false to skip it.";
+
+    public const string LogVoiceTitle = "Log voice audio";
+    public const string LogVoiceDescription = "True to log audio that's part of the voice group, false to skip it.";
 
     public const string ReloadTitle = "Reload audio packs";
 
@@ -33,12 +51,30 @@ public static class Texts
     public static string InvalidPackPath(string path, string id)
         => $"Refusing to load clip {id} from {path}, its path was outside of audio pack.";
 
+    public static string UnsupportedAudioFile(string file, string id)
+        => $"File {file} from clip {id} is not a supported audio format.";
+
     public static string DuplicateClipSkipped(string file, string id)
         => $"Audio file {file} was not loaded, clip {id} was already loaded previously.";
+
+    public static string AutoloadingClips(string path)
+        => $"Autoloading replacement clips from {AudioPackLoader.ReplaceRootPath(path)}";
+
+    public static string LoadingPack(string path)
+        => $"Loading pack from {AudioPackLoader.ReplaceRootPath(path)}";
+
+    public static string PackLoaded(AudioPack pack)
+        => $"Loaded pack {pack.Config.Id} with {pack.Config.Routes.Count} routes, {pack.LoadedClips.Count} loaded clips, {pack.DelayedLoadClips.Count} streamed clips";
+
+    public static string LoadingClip(string path, string name, bool useStreaming)
+        => $"{(useStreaming ? "Streaming" : "Loading")} clip {name} from {AudioPackLoader.ReplaceRootPath(path)}";
 
     public static string AudioCannotBeStreamed(string path, long fileSize)
         => $"Audio file {path} is above the size threshold for streaming" +
            $" ({fileSize / AudioPackLoader.OneMB}MB >= {AudioPackLoader.FileSizeLimitForLoading / AudioPackLoader.OneMB}MB)," +
            $" but it cannot be streamed using the current audio format." +
            $" Please try using one of the following supported formats: {string.Join(", ", AudioClipLoader.SupportedStreamExtensions)}.";
+
+    public static string AudioClipNotFound(string name)
+        => $"Couldn't get clip {name} to play for audio event!";
 }

@@ -19,6 +19,6 @@ internal static class Logging
         if (toggle != null && !toggle.Value)
             return;
 
-        InternalLogger.Log(level, data);
+        InternalLogger?.Log(level, data);
     }
 }

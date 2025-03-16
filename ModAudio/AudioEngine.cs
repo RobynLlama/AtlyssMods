@@ -1,8 +1,5 @@
 ﻿using Mono.Cecil;
-using System.Diagnostics;
 using UnityEngine;
-using UnityEngine.Windows;
-using static UnityEngine.Random;
 
 namespace Marioalexsan.ModAudio;
 
@@ -11,18 +8,20 @@ internal static class AudioEngine
     private struct SourceState
     {
         // Previous state
-        public AudioClip Clip;
+        public AudioClip OriginalClip;
         public float Volume;
         public float Pitch;
 
-        // Last applied state
+        // (supposedly) Current state
         public AudioClip AppliedClip;
 
         // Flags
-        public bool JustRouted;
         public bool DisableRouting;
         public bool IsOneShotSource;
         public bool IsOverlay;
+
+        // Temporary Flags
+        public bool JustRouted;
         public bool JustUsedDefaultClip;
 
         // Misc
@@ -57,7 +56,7 @@ internal static class AudioEngine
     {
         var trackedData = TrackedSources[source];
 
-        var originalClipName = trackedData.Clip?.name;
+        var originalClipName = trackedData.OriginalClip?.name;
         bool matchesOriginalClip = false;
 
         if (originalClipName != null)
@@ -168,7 +167,7 @@ internal static class AudioEngine
         {
             SourceCache.Push(source.Key);
 
-            source.Key.clip = source.Value.Clip;
+            source.Key.clip = source.Value.OriginalClip;
             source.Key.volume = source.Value.Volume;
             source.Key.pitch = source.Value.Pitch;
         }
@@ -178,6 +177,13 @@ internal static class AudioEngine
         if (hardReload)
         {
             Logging.LogInfo("Reloading audio packs...");
+
+            // Clean up handles from streams
+            foreach (var pack in AudioPacks)
+            {
+                foreach (var handle in pack.OpenStreams)
+                    handle.Dispose();
+            }    
 
             AudioPacks.Clear();
             AudioPacks.AddRange(AudioPackLoader.LoadAudioPacks());
@@ -263,28 +269,6 @@ internal static class AudioEngine
             if (source != null)
                 UnityEngine.Object.Destroy(source);
         }
-
-        // Check for any changes in tracked sources' clips
-
-        foreach (var source in TrackedSources)
-        {
-            if (source.Key.clip != source.Value.AppliedClip)
-            {
-                SourceCache.Push(source.Key);
-
-                // Need to untrack source
-
-                source.Key.clip = source.Value.Clip;
-                source.Key.volume = source.Value.Volume;
-                source.Key.pitch = source.Value.Pitch;
-            }
-        }
-
-        while (SourceCache.Count > 0)
-        {
-            var source = SourceCache.Pop();
-            TrackedSources.Remove(source);
-        }
     }
 
     private static void TrackSource(AudioSource source)
@@ -294,7 +278,7 @@ internal static class AudioEngine
             TrackedSources.Add(source, new()
             {
                 AppliedClip = source.clip,
-                Clip = source.clip,
+                OriginalClip = source.clip,
                 Pitch = source.pitch,
                 Volume = source.volume
             });
@@ -366,7 +350,7 @@ internal static class AudioEngine
         oneShotSource.volume *= volumeScale;
         oneShotSource.clip = clip;
 
-        TrackedSources[oneShotSource] = TrackedSources[oneShotSource] with { Clip = clip, Volume = oneShotSource.volume };
+        TrackedSources[oneShotSource] = TrackedSources[oneShotSource] with { OriginalClip = clip, Volume = oneShotSource.volume, AppliedClip = oneShotSource.clip };
 
         oneShotSource.Play();
 
@@ -375,9 +359,36 @@ internal static class AudioEngine
 
     private static void LogAudio(AudioSource source)
     {
-        var originalClipName = TrackedSources[source].Clip?.name ?? "(null)";
+        float distance = float.MinValue;
+
+        if (ModAudio.Plugin.UseMaxDistanceForLogging.Value && (bool)Player._mainPlayer)
+        {
+            distance = Vector3.Distance(Player._mainPlayer.transform.position, source.transform.position);
+
+            if (distance > ModAudio.Plugin.MaxDistanceForLogging.Value)
+                return;
+        }
+
+        var groupName = source.outputAudioMixerGroup.name.ToLower();
+
+        if (!ModAudio.Plugin.LogAmbience.Value && groupName == "ambience")
+            return;
+
+        if (!ModAudio.Plugin.LogGame.Value && groupName == "game")
+            return;
+
+        if (!ModAudio.Plugin.LogGUI.Value && groupName == "gui")
+            return;
+
+        if (!ModAudio.Plugin.LogMusic.Value && groupName == "music")
+            return;
+
+        if (!ModAudio.Plugin.LogVoice.Value && groupName == "voice")
+            return;
+
+        var originalClipName = TrackedSources[source].OriginalClip?.name ?? "(null)";
         var currentClipName = source.clip?.name ?? "(null)";
-        var clipChanged = TrackedSources[source].Clip != source.clip;
+        var clipChanged = TrackedSources[source].OriginalClip != source.clip;
 
         if (TrackedSources[source].JustUsedDefaultClip)
         {
@@ -395,12 +406,15 @@ internal static class AudioEngine
         var volumeDisplay = originalVolume != currentVolume ? $"{originalVolume:F2} > {currentVolume:F2}" : $"{originalVolume:F2}";
         var pitchDisplay = originalPitch != currentPitch ? $"{originalPitch:F2} > {currentPitch:F2}" : $"{originalPitch:F2}";
 
-        var messageDisplay = $"Clp {clipDisplay} | Src {source.name} | Vol {volumeDisplay} | Pit {pitchDisplay}";
+        var messageDisplay = $"Clip {clipDisplay} | Src {source.name} | Vol {volumeDisplay} | Pit {pitchDisplay} | Grp {groupName}";
+
+        if (distance != float.MinValue)
+            messageDisplay += $" | Dst {distance:F2}";
 
         if (TrackedSources[source].IsOverlay)
             messageDisplay += " (overlay)";
 
-        Logging.LogInfo(messageDisplay, ModAudio.Plugin.LogPlayedAudio);
+        Logging.LogInfo(messageDisplay, ModAudio.Plugin.LogAudioPlayed);
     }
 
     public static bool AudioPlayed(AudioSource source)
@@ -434,6 +448,18 @@ internal static class AudioEngine
     {
         TrackSource(source);
         var trackedData = TrackedSources[source];
+
+        // Check for any changes in tracked sources' clips
+        // If so, restore last volume / pitch and track new clip before routing
+
+        if (source.clip != trackedData.AppliedClip)
+        {
+            // Restore previous modifiers and track new clip
+            source.volume = trackedData.Volume;
+            source.pitch = trackedData.Pitch;
+
+            TrackedSources[source] = TrackedSources[source] with { OriginalClip = source.clip, AppliedClip = source.clip };
+        }
 
         if (trackedData.JustRouted || trackedData.DisableRouting)
             return false;
@@ -482,7 +508,7 @@ internal static class AudioEngine
 
                 if (randomSelection.Name == "___default___")
                 {
-                    destinationClip = TrackedSources[source].Clip;
+                    destinationClip = TrackedSources[source].OriginalClip;
                     TrackedSources[source] = TrackedSources[source] with { JustUsedDefaultClip = true };
                 }
                 else if (randomSelection.Name == "___nothing___")
@@ -508,7 +534,7 @@ internal static class AudioEngine
                 }
                 else
                 {
-                    Logging.LogWarning("TODO Failed to apply clip.");
+                    Logging.LogWarning(Texts.AudioClipNotFound(randomSelection.Name));
                 }
             }
         }
@@ -553,7 +579,8 @@ internal static class AudioEngine
                     {
                         Pitch = oneShotSource.pitch,
                         Volume = oneShotSource.volume,
-                        Clip = oneShotSource.clip,
+                        OriginalClip = oneShotSource.clip,
+                        AppliedClip = oneShotSource.clip,
                         IsOverlay = true,
                         DisableRouting = true
                     };
@@ -562,7 +589,7 @@ internal static class AudioEngine
                 }
                 else
                 {
-                    Logging.LogWarning($"TODO Couldn't get clip {randomSelection.Name} to play for audio event!");
+                    Logging.LogWarning(Texts.AudioClipNotFound(randomSelection.Name));
                 }
             }
         }

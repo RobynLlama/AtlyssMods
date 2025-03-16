@@ -1,5 +1,6 @@
 ﻿using BepInEx;
 using BepInEx.Logging;
+using System.IO;
 using UnityEngine;
 
 namespace Marioalexsan.ModAudio;
@@ -12,7 +13,7 @@ public static class AudioPackLoader
     public const string RoutesConfigName = "__routes.txt";
     public const int FileSizeLimitForLoading = 1024 * 1024;
 
-    private static string ReplaceRootPath(string path)
+    public static string ReplaceRootPath(string path)
     {
         return Path.GetFullPath(path)
             .Replace($"{Paths.PluginPath}/", "plugin://")
@@ -66,7 +67,7 @@ public static class AudioPackLoader
         foreach (var audioPack in audioPacks)
         {
             FinalizePack(audioPack);
-            Logging.LogInfo($"Loaded pack {audioPack.Config.Id} | Routes {audioPack.Config.Routes.Count} | Loaded clips {audioPack.LoadedClips.Count} | Streamed clips {audioPack.DelayedLoadClips.Count}");
+            Logging.LogInfo(Texts.PackLoaded(audioPack), ModAudio.Plugin.LogPackLoading);
         }
 
         return audioPacks;
@@ -169,7 +170,8 @@ public static class AudioPackLoader
 
     private static AudioPack LoadAudioPack(List<AudioPack> existingPacks, string path)
     {
-        Logging.LogInfo($"Loading audio pack from {path}", ModAudio.Plugin.LogAudioLoading);
+        Logging.LogInfo(Texts.LoadingPack(path), ModAudio.Plugin.LogPackLoading);
+
         using var stream = File.OpenRead(path);
         AudioPackConfig config = AudioPackConfig.ReadJSON(stream);
 
@@ -208,7 +210,7 @@ public static class AudioPackLoader
 
         if (pack.Config.AudioPackSettings.AutoloadReplacementClips)
         {
-            Logging.LogInfo($"Autoloading replacement clips from {path}", ModAudio.Plugin.LogAudioLoading);
+            Logging.LogInfo(Texts.AutoloadingClips(path), ModAudio.Plugin.LogPackLoading);
 
             AutoLoadReplacementClipsFromPath(path, pack);
         }
@@ -218,7 +220,7 @@ public static class AudioPackLoader
 
     private static AudioPack LoadLegacyAudioPack(List<AudioPack> existingPacks, string path)
     {
-        Logging.LogInfo($"Loading legacy pack from {path}", ModAudio.Plugin.LogAudioLoading);
+        Logging.LogInfo(Texts.LoadingPack(path), ModAudio.Plugin.LogPackLoading);
         var id = NormalizeId(ReplaceRootPath(path));
 
         if (existingPacks.Any(x => x.Config.Id == id))
@@ -246,8 +248,11 @@ public static class AudioPackLoader
             pack.Config = AudioPackConfig.ConvertFromRoutes(routes);
         }
 
-        pack.Config.DisplayName = ConvertPathToDisplayName(path);
-        pack.Config.Id = ConvertPathToId(path);
+        if (string.IsNullOrWhiteSpace(pack.Config.DisplayName))
+            pack.Config.DisplayName = ConvertPathToDisplayName(path);
+
+        if (string.IsNullOrWhiteSpace(pack.Config.Id))
+            pack.Config.Id = ConvertPathToId(path);
 
         var rootPath = Path.GetFullPath(Path.GetDirectoryName(path));
 
@@ -291,7 +296,10 @@ public static class AudioPackLoader
             bool isAudioFile = AudioClipLoader.SupportedExtensions.Any(clipPath.EndsWith);
 
             if (!isAudioFile)
+            {
+                Logging.LogWarning(Texts.UnsupportedAudioFile(clipData.Path, clipData.Name));
                 continue;
+            }
 
             long fileSize = new FileInfo(clipPath).Length;
             bool useStreaming = fileSize >= FileSizeLimitForLoading;
@@ -304,12 +312,17 @@ public static class AudioPackLoader
 
             try
             {
-                Logging.LogInfo($"Loading {(useStreaming ? "streamed " : "")}clip {clipData.Name} from {clipPath}", ModAudio.Plugin.LogAudioLoading);
+                Logging.LogInfo(Texts.LoadingClip(clipPath, clipData.Name, useStreaming), ModAudio.Plugin.LogPackLoading);
 
                 if (useStreaming)
                 {
                     // Opening a ton of streams at the start is not great, plus it adds a sizeable amount of load time if you have a lot of packs
-                    pack.DelayedLoadClips[clipData.Name] = () => AudioClipLoader.StreamFromFile(clipData.Name, clipPath, clipData.Volume);
+                    pack.DelayedLoadClips[clipData.Name] = () =>
+                    {
+                        var clip = AudioClipLoader.StreamFromFile(clipData.Name, clipPath, clipData.Volume, out var stream);
+                        pack.OpenStreams.Add(stream);
+                        return clip;
+                    };
                 }
                 else
                 {
@@ -318,7 +331,7 @@ public static class AudioPackLoader
             }
             catch (Exception e)
             {
-                Logging.LogWarning($"Failed to load {clipData.Name} from {clipPath}!");
+                Logging.LogWarning($"Failed to load {clipData.Name} from {ReplaceRootPath(clipPath)}!");
                 Logging.LogWarning($"Exception: {e}");
             }
         }
@@ -356,12 +369,17 @@ public static class AudioPackLoader
 
             try
             {
-                Logging.LogInfo($"Loading {(useStreaming ? "streamed " : "")}clip {name} from {file}", ModAudio.Plugin.LogAudioLoading);
+                Logging.LogInfo(Texts.LoadingClip(name, file, useStreaming), ModAudio.Plugin.LogPackLoading);
 
                 if (useStreaming)
                 {
                     // Opening a ton of streams at the start is not great, plus it adds a sizeable amount of load time if you have a lot of packs
-                    pack.DelayedLoadClips[name] = () => AudioClipLoader.StreamFromFile(name, file, 1f);
+                    pack.DelayedLoadClips[name] = () =>
+                    {
+                        var clip = AudioClipLoader.StreamFromFile(name, file, 1f, out var stream);
+                        pack.OpenStreams.Add(stream);
+                        return clip;
+                    };
                 }
                 else
                 {
@@ -370,7 +388,7 @@ public static class AudioPackLoader
             }
             catch (Exception e)
             {
-                Logging.LogWarning($"Failed to load {name} from {file}!");
+                Logging.LogWarning($"Failed to load {name} from {ReplaceRootPath(file)}!");
                 Logging.LogWarning($"Exception: {e}");
             }
         }

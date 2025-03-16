@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-Mar-16
+
+### Added
+
+- Added volume and pitch controls for tracks
+- Added "overlay" sounds that play alongside a track instead of replacing it completely
+- Rewrote the __routes.txt pack format to support the changes from above
+- Added a modaudio.config.json pack format that allows full control over pack loading
+- Improved load performance by streaming audio for large clips (over 1MB) that use .ogg, .mp3 or .wav
+- Added support for Nessie's EasySettings mod
+- Added support for reloading audio packs when using EasySettings, allowing you to add, remove and edit packs while you're playing
+- Added support for toggling audio packs on and off when using EasySettings
+- Added options for toggling console logging on and off when using EasySettings
+- Improved audio logging, and added a configuration setting to filter out audio that plays too far from the player (when the main player is available)
+- Added options to filter logged audio based on its audio group
+
+### Changed
+
+- Audio logging now includes way more information in a concise manner
+
+### Fixed
+
+- Fixed post-boss defeat music not being replaceable 
+- Fixed functionality being broken for audio sources that utilized `playOnAwake` for playing
+
+### Removed
+
+- OverrideCustomAudio option has been removed. It may or may not return in the future, but you can always manually edit the packs you download in case you need adjustments
+
 ## [1.1.0] - 2025-Jan-01
 
 ### Added

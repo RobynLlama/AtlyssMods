@@ -50,6 +50,9 @@ public static class AudioClipLoader
         float[] samples = new float[clip.samples * clip.channels];
         clip.GetData(samples, 0);
 
+        // You like unsafe, don't you? ... no? Damn.
+        // Memes aside, processing samples is usually a costly operation, so in this
+        // case it's worth it to drop bound checks for a bit of extra performance
         unsafe
         {
             fixed (float* sample = samples)
@@ -67,13 +70,14 @@ public static class AudioClipLoader
 
         clip.SetData(samples, 0);
 
+        dlHandler.Dispose();
         return clip;
     }
 
     /// <summary>
     /// Streams an audio clip from the disk.
     /// </summary>
-    public static AudioClip StreamFromFile(string clipName, string path, float volumeModifier)
+    public static AudioClip StreamFromFile(string clipName, string path, float volumeModifier, out IAudioStream openedStream)
     {
         IAudioStream stream = null;
 
@@ -95,14 +99,15 @@ public static class AudioClipLoader
         if (stream == null)
             throw new NotImplementedException("The given file format isn't supported for streaming.");
 
-        return AudioClip.Create(clipName, stream.TotalSamples, stream.Channels, stream.SampleRate, true, stream.OnAudioRead, stream.OnAudioSetPosition);
+        openedStream = stream;
+        return AudioClip.Create(clipName, stream.TotalFrames, stream.ChannelsPerFrame, stream.Frequency, true, stream.OnAudioRead, stream.OnAudioSetPosition);
     }
 
-    private interface IAudioStream : IDisposable
+    public interface IAudioStream : IDisposable
     {
-        int TotalSamples { get; }
-        int Channels { get; }
-        int SampleRate { get; }
+        int TotalFrames { get; }
+        int ChannelsPerFrame { get; }
+        int Frequency { get; }
 
         void OnAudioRead(float[] data);
         void OnAudioSetPosition(int newPosition);
@@ -114,9 +119,9 @@ public static class AudioClipLoader
 
         public float VolumeModifier = 1f;
 
-        public int TotalSamples => (int)_reader.TotalSamples;
-        public int Channels => _reader.Channels;
-        public int SampleRate => _reader.SampleRate;
+        public int TotalFrames => (int)_reader.TotalSamples;
+        public int ChannelsPerFrame => _reader.Channels;
+        public int Frequency => _reader.SampleRate;
 
         public void OnAudioRead(float[] data)
         {
@@ -151,9 +156,9 @@ public static class AudioClipLoader
 
         public float VolumeModifier = 1f;
 
-        public int TotalSamples => (int)_reader.SampleCount;
-        public int Channels => _reader.WaveFormat.Channels;
-        public int SampleRate => _reader.WaveFormat.SampleRate;
+        public int TotalFrames => (int)_reader.SampleCount;
+        public int ChannelsPerFrame => _reader.WaveFormat.Channels;
+        public int Frequency => _reader.WaveFormat.SampleRate;
 
         public void OnAudioRead(float[] data)
         {
@@ -188,9 +193,9 @@ public static class AudioClipLoader
 
         public float VolumeModifier = 1f;
 
-        public int TotalSamples => (int)(_reader.Length * 8 / _reader.WaveFormat.BitsPerSample);
-        public int Channels => _reader.WaveFormat.Channels;
-        public int SampleRate => _reader.WaveFormat.SampleRate;
+        public int TotalFrames => (int)(_reader.Length * 8 / ChannelsPerFrame / _reader.WaveFormat.BitsPerSample);
+        public int ChannelsPerFrame => _reader.WaveFormat.Channels;
+        public int Frequency => _reader.WaveFormat.SampleRate;
 
         public void OnAudioRead(float[] data)
         {
