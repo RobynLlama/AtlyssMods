@@ -31,7 +31,7 @@ Note: There are already plenty of audio mods created that use ModAudio on Thunde
 
 You can also use the following templates as examples:
 - [Template Mod by RockOn](https://thunderstore.io/c/atlyss/p/RockOn/MusicModTemplate/) on Thunderstore, that shows you how to use the basic route format
-- [ModAudioTemplate](https://github.com/Marioalexsan/AtlyssMods/ModAudioTemplate) on GitHub, that shows you the full format available
+- [ModAudioTemplate](https://github.com/Marioalexsan/AtlyssMods/tree/main/ModAudioTemplate) on GitHub, that shows you the full format available
 
 ## Basic audio pack format (v1.1.0)
 
@@ -83,9 +83,9 @@ This audio mod will do the following:
 
 The new format for __routes.txt in 2.0.0 uses a different syntax that gives you access to new features, such as overlays, effects, and other stuff.
 
-You can check out the [ModAudioTemplate](https://github.com/Marioalexsan/AtlyssMods/ModAudioTemplate) example audio pack for reference.
+You can check out the [ModAudioTemplate](https://github.com/Marioalexsan/AtlyssMods/tree/main/ModAudioTemplate) example audio pack for reference.
 
-The format is documented in greater detail within the [__routes.txt](https://github.com/Marioalexsan/AtlyssMods/ModAudioTemplate/audio/__routes.txt) file from it.
+The format is documented in greater detail within the [__routes.txt](https://github.com/Marioalexsan/AtlyssMods/blob/main/ModAudioTemplate/audio/__routes.txt) file from it.
 
 # Packaging your audio mods for Thunderstore / r2modman
 
