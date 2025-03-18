@@ -2,6 +2,7 @@
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
+using Marioalexsan.ModAudio.HarmonyPatches;
 using Marioalexsan.ModAudio.SoftDependencies;
 using Mono.Cecil;
 using Newtonsoft.Json;
@@ -70,7 +71,7 @@ public class ModAudio : BaseUnityPlugin
     private void InitializeConfiguration()
     {
         LogPackLoading = Config.Bind("Logging", nameof(LogPackLoading), true, Texts.LogAudioLoadingDescription);
-        LogAudioPlayed = Config.Bind("Logging", nameof(LogAudioPlayed), true, Texts.LogAudioPlayedDescription);
+        LogAudioPlayed = Config.Bind("Logging", nameof(LogAudioPlayed), false, Texts.LogAudioPlayedDescription);
         UseMaxDistanceForLogging = Config.Bind("Logging", nameof(UseMaxDistanceForLogging), false, Texts.UseMaxDistanceForLoggingDescription);
         MaxDistanceForLogging = Config.Bind("Logging", nameof(MaxDistanceForLogging), 32f, new ConfigDescription(Texts.MaxDistanceForLoggingDescription, new AcceptableValueRange<float>(32f, 2048)));
 
@@ -84,26 +85,34 @@ public class ModAudio : BaseUnityPlugin
         {
             EasySettings.OnApplySettings.AddListener(() =>
             {
-                Config.Save();
-
-                bool softReloadRequired = false;
-
-                foreach (var pack in AudioEngine.AudioPacks)
+                try
                 {
-                    var enabled = !AudioPackEnabled.TryGetValue(pack.Config.Id, out var config) || config.Value;
+                    Config.Save();
 
-                    if (enabled != pack.Enabled)
+                    bool softReloadRequired = false;
+
+                    foreach (var pack in AudioEngine.AudioPacks)
                     {
-                        Logger.LogInfo($"Pack {pack.Config.Id} is now {(enabled ? "enabled" : "disabled")}");
-                        softReloadRequired = true;
+                        var enabled = !AudioPackEnabled.TryGetValue(pack.Config.Id, out var config) || config.Value;
+
+                        if (enabled != pack.Enabled)
+                        {
+                            Logger.LogInfo($"Pack {pack.Config.Id} is now {(enabled ? "enabled" : "disabled")}");
+                            softReloadRequired = true;
+                        }
+
+
+                        pack.Enabled = enabled;
                     }
 
-
-                    pack.Enabled = enabled;
+                    if (softReloadRequired)
+                        AudioEngine.SoftReload();
                 }
-
-                if (softReloadRequired)
-                    AudioEngine.SoftReload();
+                catch (Exception e)
+                {
+                    Logging.LogError($"ModAudio crashed in OnApplySettings! Please report this error to the mod developer:");
+                    Logging.LogError(e.ToString());
+                }
             });
             EasySettings.OnInitialized.AddListener(() =>
             {
@@ -204,14 +213,22 @@ public class ModAudio : BaseUnityPlugin
 
     private void Update()
     {
-        if (_reloadRequired)
+        try
         {
-            _reloadRequired = false;
-            CheckForObsoleteStuff();
+            if (_reloadRequired)
+            {
+                _reloadRequired = false;
+                CheckForObsoleteStuff();
 
-            AudioEngine.HardReload();
+                AudioEngine.HardReload();
+            }
+
+            AudioEngine.Update();
         }
-
-        AudioEngine.Update();
+        catch (Exception e)
+        {
+            Logging.LogError($"ModAudio crashed in {nameof(Update)}! Please report this error to the mod developer:");
+            Logging.LogError(e.ToString());
+        }
     }
 }

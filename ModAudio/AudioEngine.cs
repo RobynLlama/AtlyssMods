@@ -1,4 +1,5 @@
-﻿using Mono.Cecil;
+﻿using Marioalexsan.ModAudio.HarmonyPatches;
+using Mono.Cecil;
 using UnityEngine;
 
 namespace Marioalexsan.ModAudio;
@@ -127,147 +128,164 @@ internal static class AudioEngine
 
     private static void Reload(bool hardReload)
     {
-        Logging.LogInfo("Reloading engine...");
-
-        if (hardReload)
+        try
         {
-            // Get rid of one-shots forcefully
+            Logging.LogInfo("Reloading engine...");
+
+            if (hardReload)
+            {
+                // Get rid of one-shots forcefully
+                SourceCache.Clear();
+
+                foreach (var source in TrackedSources)
+                {
+                    if (source.Value.IsOneShotSource)
+                    {
+                        SourceCache.Push(source.Key);
+                    }
+                }
+
+                while (SourceCache.Count > 0)
+                {
+                    var source = SourceCache.Pop();
+                    TrackedSources.Remove(source);
+                    UnityEngine.Object.Destroy(source);
+                }
+            }
+
+            // Restore previous state
+            Dictionary<AudioSource, bool> wasPlayingPreviously = [];
+
+            foreach (var audio in UnityEngine.Object.FindObjectsOfType<AudioSource>(true))
+            {
+                wasPlayingPreviously[audio] = audio.isPlaying;
+
+                if (wasPlayingPreviously[audio])
+                {
+                    audio.Stop();
+                }
+            }
+
+            foreach (var source in TrackedSources)
+            {
+                SourceCache.Push(source.Key);
+
+                source.Key.clip = source.Value.OriginalClip;
+                source.Key.volume = source.Value.Volume;
+                source.Key.pitch = source.Value.Pitch;
+            }
+
+            TrackedSources.Clear();
+
+            if (hardReload)
+            {
+                Logging.LogInfo("Reloading audio packs...");
+
+                // Clean up handles from streams
+                foreach (var pack in AudioPacks)
+                {
+                    foreach (var handle in pack.OpenStreams)
+                        handle.Dispose();
+                }
+
+                AudioPacks.Clear();
+                AudioPacks.AddRange(AudioPackLoader.LoadAudioPacks());
+                ModAudio.Plugin.InitializePackConfiguration(); // TODO I wish ModAudio plugin ref wouldn't be here
+            }
+
+            // Restart audio
+            foreach (var audio in UnityEngine.Object.FindObjectsOfType<AudioSource>(true))
+            {
+                if (wasPlayingPreviously[audio])
+                    audio.Play();
+            }
+
+            Logging.LogInfo("Done with reload!");
+        }
+        catch (Exception e)
+        {
+            Logging.LogError($"ModAudio crashed in {nameof(Reload)}! Please report this error to the mod developer:");
+            Logging.LogError(e.ToString());
+            return;
+        }
+    }
+
+    public static void Update()
+    {
+        try
+        {
+            // Check play on awake sounds
+            bool checkPlayOnAwake = true;
+
+            if (checkPlayOnAwake)
+            {
+                foreach (var audio in UnityEngine.Object.FindObjectsOfType<AudioSource>(true))
+                {
+                    if (audio.playOnAwake)
+                    {
+                        if (!TrackedPlayOnAwakeSources.Contains(audio) && audio.isActiveAndEnabled)
+                        {
+                            TrackedPlayOnAwakeSources.Add(audio);
+                            AudioPlayed(audio);
+                        }
+                        else if (TrackedPlayOnAwakeSources.Contains(audio) && !audio.isActiveAndEnabled)
+                        {
+                            TrackedPlayOnAwakeSources.Remove(audio);
+                        }
+                    }
+                }
+            }
+
+            // Cleanup dead play on awake sounds
+            SourceCache.Clear();
+
+            foreach (var source in TrackedPlayOnAwakeSources)
+            {
+                if (source == null)
+                    SourceCache.Push(source);
+            }
+
+            while (SourceCache.Count > 0)
+            {
+                TrackedPlayOnAwakeSources.Remove(SourceCache.Pop());
+            }
+
+            // Cleanup stale stuff
             SourceCache.Clear();
 
             foreach (var source in TrackedSources)
             {
-                if (source.Value.IsOneShotSource)
-                {
+                if (source.Key == null)
                     SourceCache.Push(source.Key);
-                }
+            }
+
+            while (SourceCache.Count > 0)
+            {
+                TrackedSources.Remove(SourceCache.Pop());
+            }
+
+            // Cleanup dead one shot sources
+            SourceCache.Clear();
+
+            foreach (var source in TrackedSources)
+            {
+                if (source.Value.IsOneShotSource && !source.Key.isPlaying)
+                    SourceCache.Push(source.Key);
             }
 
             while (SourceCache.Count > 0)
             {
                 var source = SourceCache.Pop();
                 TrackedSources.Remove(source);
-                UnityEngine.Object.Destroy(source);
+
+                if (source != null)
+                    UnityEngine.Object.Destroy(source);
             }
         }
-
-        // Restore previous state
-        Dictionary<AudioSource, bool> wasPlayingPreviously = [];
-
-        foreach (var audio in UnityEngine.Object.FindObjectsOfType<AudioSource>(true))
+        catch (Exception e)
         {
-            wasPlayingPreviously[audio] = audio.isPlaying;
-
-            if (wasPlayingPreviously[audio])
-            {
-                audio.Stop();
-            }
-        }
-
-        foreach (var source in TrackedSources)
-        {
-            SourceCache.Push(source.Key);
-
-            source.Key.clip = source.Value.OriginalClip;
-            source.Key.volume = source.Value.Volume;
-            source.Key.pitch = source.Value.Pitch;
-        }
-
-        TrackedSources.Clear();
-
-        if (hardReload)
-        {
-            Logging.LogInfo("Reloading audio packs...");
-
-            // Clean up handles from streams
-            foreach (var pack in AudioPacks)
-            {
-                foreach (var handle in pack.OpenStreams)
-                    handle.Dispose();
-            }    
-
-            AudioPacks.Clear();
-            AudioPacks.AddRange(AudioPackLoader.LoadAudioPacks());
-            ModAudio.Plugin.InitializePackConfiguration(); // TODO I wish ModAudio plugin ref wouldn't be here
-        }
-
-        // Restart audio
-        foreach (var audio in UnityEngine.Object.FindObjectsOfType<AudioSource>(true))
-        {
-            if (wasPlayingPreviously[audio])
-                audio.Play();
-        }
-
-        Logging.LogInfo("Done with reload!");
-    }
-
-    public static void Update()
-    {
-        // Check play on awake sounds
-        bool checkPlayOnAwake = true;
-
-        if (checkPlayOnAwake)
-        {
-            foreach (var audio in UnityEngine.Object.FindObjectsOfType<AudioSource>(true))
-            {
-                if (audio.playOnAwake)
-                {
-                    if (!TrackedPlayOnAwakeSources.Contains(audio) && audio.isActiveAndEnabled)
-                    {
-                        TrackedPlayOnAwakeSources.Add(audio);
-                        AudioPlayed(audio);
-                    }
-                    else if (TrackedPlayOnAwakeSources.Contains(audio) && !audio.isActiveAndEnabled)
-                    {
-                        TrackedPlayOnAwakeSources.Remove(audio);
-                    }
-                }
-            }
-        }
-
-        // Cleanup dead play on awake sounds
-        SourceCache.Clear();
-
-        foreach (var source in TrackedPlayOnAwakeSources)
-        {
-            if (source == null)
-                SourceCache.Push(source);
-        }
-
-        while (SourceCache.Count > 0)
-        {
-            TrackedPlayOnAwakeSources.Remove(SourceCache.Pop());
-        }
-
-        // Cleanup stale stuff
-        SourceCache.Clear();
-
-        foreach (var source in TrackedSources)
-        {
-            if (source.Key == null)
-                SourceCache.Push(source.Key);
-        }
-
-        while (SourceCache.Count > 0)
-        {
-            TrackedSources.Remove(SourceCache.Pop());
-        }
-
-        // Cleanup dead one shot sources
-        SourceCache.Clear();
-
-        foreach (var source in TrackedSources)
-        {
-            if (source.Value.IsOneShotSource && !source.Key.isPlaying)
-                SourceCache.Push(source.Key);
-        }
-
-        while (SourceCache.Count > 0)
-        {
-            var source = SourceCache.Pop();
-            TrackedSources.Remove(source);
-
-            if (source != null)
-                UnityEngine.Object.Destroy(source);
+            Logging.LogError($"ModAudio crashed in {nameof(Update)}! Please report this error to the mod developer:");
+            Logging.LogError(e.ToString());
         }
     }
 
@@ -330,31 +348,59 @@ internal static class AudioEngine
 
     public static bool AudioStopped(AudioSource source, bool stopOneShots)
     {
-        if (stopOneShots)
+        try
         {
-            foreach (var trackedSource in TrackedSources)
+            if (stopOneShots)
             {
-                if (trackedSource.Value.IsOneShotSource && trackedSource.Value.OneShotOrigin == source && trackedSource.Key != null && trackedSource.Key.isPlaying)
-                    trackedSource.Key.Stop();
+                foreach (var trackedSource in TrackedSources)
+                {
+                    if (trackedSource.Value.IsOneShotSource && trackedSource.Value.OneShotOrigin == source && trackedSource.Key != null && trackedSource.Key.isPlaying)
+                        trackedSource.Key.Stop();
+                }
             }
-        }
 
-        return true;
+            return true;
+        }
+        catch (Exception e)
+        {
+            Logging.LogError($"ModAudio crashed in {nameof(AudioStopped)}! Please report this error to the mod developer:");
+            Logging.LogError(e.ToString());
+            Logging.LogError($"AudioSource that caused the crash:");
+            Logging.LogError($"  name = {source?.name ?? "(null)"}");
+            Logging.LogError($"  clip = {source?.clip?.name ?? "(null)"}");
+            Logging.LogError($"Parameter {nameof(stopOneShots)} was: {stopOneShots}");
+            return true;
+        }
     }
 
     public static bool OneShotClipPlayed(AudioClip clip, AudioSource source, float volumeScale)
     {
-        // Move to a dedicated audio source for better control. Note: This is likely overkill and might mess with other mods?
+        try
+        {
+            // Move to a dedicated audio source for better control. Note: This is likely overkill and might mess with other mods?
 
-        var oneShotSource = CreateOneShotFromSource(source);
-        oneShotSource.volume *= volumeScale;
-        oneShotSource.clip = clip;
+            var oneShotSource = CreateOneShotFromSource(source);
+            oneShotSource.volume *= volumeScale;
+            oneShotSource.clip = clip;
 
-        TrackedSources[oneShotSource] = TrackedSources[oneShotSource] with { OriginalClip = clip, Volume = oneShotSource.volume, AppliedClip = oneShotSource.clip };
+            TrackedSources[oneShotSource] = TrackedSources[oneShotSource] with { OriginalClip = clip, Volume = oneShotSource.volume, AppliedClip = oneShotSource.clip };
 
-        oneShotSource.Play();
+            oneShotSource.Play();
 
-        return false;
+            return false;
+        }
+        catch (Exception e)
+        {
+            Logging.LogError($"ModAudio crashed in {nameof(OneShotClipPlayed)}! Please report this error to the mod developer:");
+            Logging.LogError(e.ToString());
+            Logging.LogError($"AudioSource that caused the crash:");
+            Logging.LogError($"  name = {source?.name ?? "(null)"}");
+            Logging.LogError($"  clip = {source?.clip?.name ?? "(null)"}");
+            Logging.LogError($"AudioClip that caused the crash:");
+            Logging.LogError($"  name = {clip?.name ?? "(null)"}");
+            Logging.LogError($"Parameter {nameof(volumeScale)} was: {volumeScale}");
+            return true;
+        }
     }
 
     private static void LogAudio(AudioSource source)
@@ -369,7 +415,7 @@ internal static class AudioEngine
                 return;
         }
 
-        var groupName = source.outputAudioMixerGroup.name.ToLower();
+        var groupName = source.outputAudioMixerGroup?.name?.ToLower() ?? "(null)"; // This can be null, apparently...
 
         if (!ModAudio.Plugin.LogAmbience.Value && groupName == "ambience")
             return;
@@ -419,29 +465,41 @@ internal static class AudioEngine
 
     public static bool AudioPlayed(AudioSource source)
     {
-        var wasPlaying = source.isPlaying;
-
-        if (!Route(source))
+        try
         {
-            LogAudio(source);
+            var wasPlaying = source.isPlaying;
+
+            if (!Route(source))
+            {
+                LogAudio(source);
+                return true;
+            }
+
+            TrackedSources[source] = TrackedSources[source] with { JustRouted = false };
+
+            bool requiresRestart = wasPlaying && !source.isPlaying;
+
+            if (requiresRestart)
+            {
+                source.Play();
+            }
+            else
+            {
+                LogAudio(source);
+            }
+
+            // If a restart was required, then we already played the sound manually again, so let's skip the original
+            return !requiresRestart;
+        }
+        catch (Exception e)
+        {
+            Logging.LogError($"ModAudio crashed in {nameof(AudioPlayed)}! Please report this error to the mod developer:");
+            Logging.LogError(e.ToString());
+            Logging.LogError($"AudioSource that caused the crash:");
+            Logging.LogError($"  name = {source?.name ?? "(null)"}");
+            Logging.LogError($"  clip = {source?.clip?.name ?? "(null)"}");
             return true;
         }
-
-        TrackedSources[source] = TrackedSources[source] with { JustRouted = false };
-
-        bool requiresRestart = wasPlaying && !source.isPlaying;
-
-        if (requiresRestart)
-        {
-            source.Play();
-        }
-        else
-        {
-            LogAudio(source);
-        }
-
-        // If a restart was required, then we already played the sound manually again, so let's skip the original
-        return !requiresRestart;
     }
 
     private static bool Route(AudioSource source)

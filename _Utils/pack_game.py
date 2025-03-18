@@ -91,14 +91,18 @@ with open(csprojs[0], 'r') as f:
 
 os.chdir(os.path.join('bin', 'Debug', FRAMEWORK))
 ASSEMBLIES = [os.path.abspath(path) for path in glob.glob('*.dll') if keep_assembly_dependency(path)]
+PDBS = [os.path.abspath(path) for path in glob.glob('*.pdb')]
 
 if len(ASSEMBLIES) == 0:
   print('Couldn\'t find build files, please check that the project has been built in Debug mode.')
   sys.exit(1)
 
-print('Will copy the following DLLs to the package:')
+print('Will copy the following DLLs and PDBs to the package:')
 
 for assembly in ASSEMBLIES:
+  print(' - ' + assembly)
+
+for assembly in PDBS:
   print(' - ' + assembly)
 
 os.chdir(os.path.join('..', '..', '..', '..'))
@@ -138,6 +142,10 @@ with zipfile.ZipFile(os.path.join('_ThunderstoreBuild', f'{MOD_GUID}.zip'), 'w',
   for assembly in ASSEMBLIES:
     with open(assembly, 'rb') as f:
       pkg.writestr('plugins/' + os.path.basename(assembly), f.read())
+
+  for pdb in PDBS:
+    with open(pdb, 'rb') as f:
+      pkg.writestr('plugins/' + os.path.basename(pdb), f.read())
 
 os.chdir(LAST_WORKDIR)
 print('Done!')
