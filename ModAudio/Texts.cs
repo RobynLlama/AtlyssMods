@@ -31,6 +31,8 @@ public static class Texts
 
     public const string ReloadTitle = "Reload audio packs";
 
+    public const string OpenCustomAudioPackTitle = "Open custom audio pack folder";
+
     public static string WeightClamped(float weight, AudioPack pack)
         => $"Pack {pack.Config.Id} has a weight {weight} that is outside the [{ModAudio.MinWeight}, {ModAudio.MaxWeight}] range and will be clamped.";
 

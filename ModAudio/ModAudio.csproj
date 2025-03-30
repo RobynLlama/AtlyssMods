@@ -7,7 +7,7 @@
         <AssemblyName>Marioalexsan.ModAudio</AssemblyName>
         <RootNamespace>Marioalexsan.ModAudio</RootNamespace>
         <Product>ModAudio</Product>
-        <Version>2.1.0</Version>
+        <Version>2.2.0</Version>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>latest</LangVersion>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
@@ -115,6 +115,10 @@
         </Reference>
         <Reference Include="UnityEngine.TextRenderingModule">
             <HintPath>$(ATLYSS_MANAGED)\UnityEngine.TextRenderingModule.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="UnityEngine.ParticleSystemModule">
+            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.ParticleSystemModule.dll</HintPath>
             <Private>False</Private>
         </Reference>
         <Reference Include="Newtonsoft.Json">

@@ -24,6 +24,7 @@ internal static class AudioEngine
         // Temporary Flags
         public bool JustRouted;
         public bool JustUsedDefaultClip;
+        public bool WasStoppedOrDisabled;
 
         // Misc
         public AudioSource OneShotOrigin;
@@ -46,8 +47,13 @@ internal static class AudioEngine
         {
             if (_emptyClip == null)
             {
-                _emptyClip = AudioClip.Create("___nothing___", 256, 1, 44100, false);
-                _emptyClip.SetData(new float[256], 0);
+                // Setting this too low might cause it to fail for playOnAwake sources
+                // This is due to the detection method in Update(), which relies on scanning audio sources every frame
+                // This is why we need to use a minimum size (a few game frames at least).
+                const int EmptyClipSizeInSamples = 16384; // 0.37 seconds
+
+                _emptyClip = AudioClip.Create("___nothing___", EmptyClipSizeInSamples, 1, 44100, false);
+                _emptyClip.SetData(new float[EmptyClipSizeInSamples], 0);
             }
 
             return _emptyClip;
@@ -307,7 +313,10 @@ internal static class AudioEngine
                 TrackedSources.Remove(source);
 
                 if (source != null)
+                {
+                    AudioStopped(source, false);
                     UnityEngine.Object.Destroy(source);
+                }
             }
         }
         catch (Exception e)
@@ -335,9 +344,29 @@ internal static class AudioEngine
 
     private static AudioSource CreateOneShotFromSource(AudioSource source)
     {
-        var oneShotSource = source.gameObject.AddComponent<AudioSource>();
+        GameObject targetObject = source.gameObject;
 
-        oneShotSource.name = "oneshot";
+        // Note: some sound effects are played on particle systems that disable themselves after they're played
+        // We need to check if that is the case, and move the target object somewhere higher in the hierarchy
+        // Unfortunately there's no API to check if the particle system actually has stop behaviour set to disable
+
+        int parentsToGoThrough = 3;
+
+        do
+        {
+            var particleSystem = targetObject.GetComponent<ParticleSystem>();
+
+            if (particleSystem == null)
+                break;
+
+            if (targetObject.transform.parent == null)
+                break;
+
+            targetObject = targetObject.transform.parent.gameObject;
+        }
+        while (parentsToGoThrough-- > 0);
+
+        var oneShotSource = targetObject.AddComponent<AudioSource>();
 
         oneShotSource.volume = source.volume;
         oneShotSource.pitch = source.pitch;
@@ -374,38 +403,6 @@ internal static class AudioEngine
         TrackedSources[oneShotSource] = TrackedSources[oneShotSource] with { IsOneShotSource = true, OneShotOrigin = source };
 
         return oneShotSource;
-    }
-
-    public static bool AudioStopped(AudioSource source, bool stopOneShots)
-    {
-        try
-        {
-            if (source.playOnAwake)
-            {
-                TrackedPlayOnAwakeSources.Remove(source);
-            }
-
-            if (stopOneShots)
-            {
-                foreach (var trackedSource in TrackedSources)
-                {
-                    if (trackedSource.Value.IsOneShotSource && trackedSource.Value.OneShotOrigin == source && trackedSource.Key != null && trackedSource.Key.isPlaying)
-                        trackedSource.Key.Stop();
-                }
-            }
-
-            return true;
-        }
-        catch (Exception e)
-        {
-            Logging.LogError($"ModAudio crashed in {nameof(AudioStopped)}! Please report this error to the mod developer:");
-            Logging.LogError(e.ToString());
-            Logging.LogError($"AudioSource that caused the crash:");
-            Logging.LogError($"  name = {source?.name ?? "(null)"}");
-            Logging.LogError($"  clip = {source?.clip?.name ?? "(null)"}");
-            Logging.LogError($"Parameter {nameof(stopOneShots)} was: {stopOneShots}");
-            return true;
-        }
     }
 
     public static bool OneShotClipPlayed(AudioClip clip, AudioSource source, float volumeScale)
@@ -492,13 +489,16 @@ internal static class AudioEngine
         var volumeDisplay = originalVolume != currentVolume ? $"{originalVolume:F2} > {currentVolume:F2}" : $"{originalVolume:F2}";
         var pitchDisplay = originalPitch != currentPitch ? $"{originalPitch:F2} > {currentPitch:F2}" : $"{originalPitch:F2}";
 
-        var messageDisplay = $"Clip {clipDisplay} | Src {source.name} | Vol {volumeDisplay} | Pit {pitchDisplay} | Grp {groupName}";
+        var messageDisplay = $"Clip {clipDisplay} Src {source.name} Vol {volumeDisplay} Pit {pitchDisplay} Grp {groupName}";
 
         if (distance != float.MinValue)
-            messageDisplay += $" | Dst {distance:F2}";
+            messageDisplay += $" Dst {distance:F2}";
 
         if (TrackedSources[source].IsOverlay)
-            messageDisplay += " (overlay)";
+            messageDisplay += " overlay";
+
+        if (TrackedSources[source].IsOneShotSource)
+            messageDisplay += " oneshot";
 
         Logging.LogInfo(messageDisplay, ModAudio.Plugin.LogAudioPlayed);
     }
@@ -507,6 +507,8 @@ internal static class AudioEngine
     {
         try
         {
+            TrackSource(source);
+
             if (source.playOnAwake)
             {
                 TrackedPlayOnAwakeSources.Add(source);
@@ -520,7 +522,10 @@ internal static class AudioEngine
                 return true;
             }
 
-            TrackedSources[source] = TrackedSources[source] with { JustRouted = false };
+            TrackedSources[source] = TrackedSources[source] with {
+                JustRouted = false,
+                WasStoppedOrDisabled = false
+            };
 
             bool requiresRestart = wasPlaying && !source.isPlaying;
 
@@ -547,11 +552,44 @@ internal static class AudioEngine
         }
     }
 
+    public static bool AudioStopped(AudioSource source, bool stopOneShots)
+    {
+        try
+        {
+            TrackSource(source);
+
+            if (source.playOnAwake)
+            {
+                TrackedPlayOnAwakeSources.Remove(source);
+            }
+
+            if (stopOneShots)
+            {
+                foreach (var trackedSource in TrackedSources)
+                {
+                    if (trackedSource.Value.IsOneShotSource && trackedSource.Value.OneShotOrigin == source && trackedSource.Key != null && trackedSource.Key.isPlaying)
+                        trackedSource.Key.Stop();
+                }
+            }
+
+            TrackedSources[source] = TrackedSources[source] with { WasStoppedOrDisabled = true };
+
+            return true;
+        }
+        catch (Exception e)
+        {
+            Logging.LogError($"ModAudio crashed in {nameof(AudioStopped)}! Please report this error to the mod developer:");
+            Logging.LogError(e.ToString());
+            Logging.LogError($"AudioSource that caused the crash:");
+            Logging.LogError($"  name = {source?.name ?? "(null)"}");
+            Logging.LogError($"  clip = {source?.clip?.name ?? "(null)"}");
+            Logging.LogError($"Parameter {nameof(stopOneShots)} was: {stopOneShots}");
+            return true;
+        }
+    }
+
     private static bool Route(AudioSource source)
     {
-        bool sourceWouldRestart = source.isPlaying;
-
-        TrackSource(source);
         var trackedData = TrackedSources[source];
 
         // Check for any changes in tracked sources' clips
@@ -671,8 +709,10 @@ internal static class AudioEngine
                         AppliedVolume = source.volume
                     };
 
-                    if (source.isPlaying)
+                    if (source.clip != destinationClip && source.isPlaying)
+                    {
                         source.Stop();
+                    }
 
                     source.clip = destinationClip;
                 }
@@ -689,7 +729,7 @@ internal static class AudioEngine
         {
             foreach (var route in pack.Config.Routes)
             {
-                if (route.OverlaysIgnoreRestarts && sourceWouldRestart)
+                if (route.OverlaysIgnoreRestarts && !(TrackedSources[source].WasStoppedOrDisabled || !source.isPlaying))
                     continue;
 
                 if (route.OverlayClips.Count > 0 && IsValidTarget(source, route) && (!route.LinkOverlayAndReplacement || replacementRoute.Route == route)) 

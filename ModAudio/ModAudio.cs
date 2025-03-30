@@ -134,6 +134,11 @@ public class ModAudio : BaseUnityPlugin
             if (EasySettings.IsAvailable)
             {
                 EasySettings.AddHeader($"{ModInfo.PLUGIN_NAME} audio packs");
+                EasySettings.AddButton(Texts.OpenCustomAudioPackTitle, () =>
+                {
+                    SetupBaseAudioPack();
+                    Application.OpenURL(new Uri($"{ModAudioConfigFolder}").AbsoluteUri);
+                });
                 AudioPackEnabledRoot = EasySettings.AddButton(Texts.ReloadTitle, () => _reloadRequired = true);
             }
         }

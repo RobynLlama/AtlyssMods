@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2025-Mar-30
+
+### Added
+
+- Added a button in EasySettings that opens the custom / user audio pack folder for easy access
+
+### Fixed
+
+- Fixed some overlay sounds being interrupted mid-playthrough when played from components that have particle system components
+  - Technial details: The sound is played from a game object higher in the hierarchy as a workaround for the game object being disabled by the particle system
+- Fixed routing failing occasionally when using `___nothing___` as a replacement
+- Fixed game object names being erroneously set to "oneshot" for display purposes
+  - It will now use the correct object name and instead append "oneshot" to logged lines for played audio
+
 ## [2.1.0] - 2025-Mar-29
 
 ### Added
