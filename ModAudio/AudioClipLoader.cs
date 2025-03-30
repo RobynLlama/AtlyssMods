@@ -50,23 +50,7 @@ public static class AudioClipLoader
         float[] samples = new float[clip.samples * clip.channels];
         clip.GetData(samples, 0);
 
-        // You like unsafe, don't you? ... no? Damn.
-        // Memes aside, processing samples is usually a costly operation, so in this
-        // case it's worth it to drop bound checks for a bit of extra performance
-        unsafe
-        {
-            fixed (float* sample = samples)
-            {
-                float* current = sample;
-                float* end = sample + samples.Length;
-
-                while (current != end)
-                {
-                    *current = *current * volumeModifier;
-                    current++;
-                }
-            }
-        }
+        OptimizedMethods.MultiplyFloatArray(samples, volumeModifier);
 
         clip.SetData(samples, 0);
 
@@ -109,7 +93,7 @@ public static class AudioClipLoader
         int ChannelsPerFrame { get; }
         int Frequency { get; }
 
-        void OnAudioRead(float[] data);
+        void OnAudioRead(float[] samples); // Unity seems to be calling this with float[4096]
         void OnAudioSetPosition(int newPosition);
     }
 
@@ -123,14 +107,10 @@ public static class AudioClipLoader
         public int ChannelsPerFrame => _reader.Channels;
         public int Frequency => _reader.SampleRate;
 
-        public void OnAudioRead(float[] data)
+        public void OnAudioRead(float[] samples)
         {
-            _reader.ReadSamples(data);
-
-            for (int i = 0; i < data.Length; i++)
-            {
-                data[i] *= VolumeModifier;
-            }
+            _reader.ReadSamples(samples);
+            OptimizedMethods.MultiplyFloatArray(samples, VolumeModifier);
         }
 
         public void OnAudioSetPosition(int newPosition)
@@ -160,14 +140,10 @@ public static class AudioClipLoader
         public int ChannelsPerFrame => _reader.WaveFormat.Channels;
         public int Frequency => _reader.WaveFormat.SampleRate;
 
-        public void OnAudioRead(float[] data)
+        public void OnAudioRead(float[] samples)
         {
-            _provider.Read(data, 0, data.Length);
-
-            for (int i = 0; i < data.Length; i++)
-            {
-                data[i] *= VolumeModifier;
-            }
+            _provider.Read(samples, 0, samples.Length);
+            OptimizedMethods.MultiplyFloatArray(samples, VolumeModifier);
         }
 
         public void OnAudioSetPosition(int newPosition)
@@ -197,14 +173,10 @@ public static class AudioClipLoader
         public int ChannelsPerFrame => _reader.WaveFormat.Channels;
         public int Frequency => _reader.WaveFormat.SampleRate;
 
-        public void OnAudioRead(float[] data)
+        public void OnAudioRead(float[] samples)
         {
-            _provider.Read(data, 0, data.Length);
-
-            for (int i = 0; i < data.Length; i++)
-            {
-                data[i] *= VolumeModifier;
-            }
+            _provider.Read(samples, 0, samples.Length);
+            OptimizedMethods.MultiplyFloatArray(samples, VolumeModifier);
         }
 
         public void OnAudioSetPosition(int newPosition)

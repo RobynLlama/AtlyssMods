@@ -1,7 +1,4 @@
 ﻿using HarmonyLib;
-using Mirror;
-using System.Reflection;
-using System.Reflection.Emit;
 using UnityEngine;
 
 namespace Marioalexsan.ModAudio.HarmonyPatches;

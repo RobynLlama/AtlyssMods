@@ -1,12 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <!-- Generic assembly info. -->
     <PropertyGroup>
+        <DebugType>embedded</DebugType>
         <TargetFramework>net48</TargetFramework>
         <ThunderstoreName>ModAudio</ThunderstoreName>
         <AssemblyName>Marioalexsan.ModAudio</AssemblyName>
         <RootNamespace>Marioalexsan.ModAudio</RootNamespace>
         <Product>ModAudio</Product>
-        <Version>2.0.1</Version>
+        <Version>2.1.0</Version>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>latest</LangVersion>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
@@ -52,6 +53,14 @@
         </Reference>
 
         <!-- Unity. Add any other assemblies as needed, not all of them were listed here. -->
+        <Reference Include="Unity.Burst">
+            <HintPath>$(ATLYSS_MANAGED)\Unity.Burst.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="Unity.Mathematics">
+            <HintPath>$(ATLYSS_MANAGED)\Unity.Mathematics.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
         <Reference Include="UnityEngine">
             <HintPath>$(ATLYSS_MANAGED)\UnityEngine.dll</HintPath>
             <Private>False</Private>
@@ -173,8 +182,8 @@
         </Reference>
     </ItemGroup>
     <ItemGroup>
-      <Folder Include="Utils\" />
-    </ItemGroup>    
+        <Folder Include="Utils\" />
+    </ItemGroup>
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
         <Exec Command="python ../_Utils/pack_game.py $(MSBuildProjectName)/" ContinueOnError="true" />
     </Target>

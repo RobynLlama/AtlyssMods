@@ -2,12 +2,8 @@
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
-using Marioalexsan.ModAudio.HarmonyPatches;
 using Marioalexsan.ModAudio.SoftDependencies;
-using Mono.Cecil;
-using Newtonsoft.Json;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace Marioalexsan.ModAudio;
 

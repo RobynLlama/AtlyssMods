@@ -1,6 +1,4 @@
-﻿using System.Text.RegularExpressions;
-
-namespace Marioalexsan.ModAudio;
+﻿namespace Marioalexsan.ModAudio;
 
 public class RouteConfig
 {
@@ -370,9 +368,26 @@ public class RouteConfig
                             route.Pitch = pitch;
                         }
                         break;
+                    case "overlays_ignore_restarts":
+                        {
+                            if (fields.Length != 2)
+                            {
+                                Logging.LogWarning($"Line {lineNumber}: Expected a value for overlays_ignore_restarts.");
+                                continue;
+                            }
+
+                            if (!bool.TryParse(fields[1], out bool overlaysIgnoreRestarts))
+                            {
+                                Logging.LogWarning($"Line {lineNumber}: Couldn't parse {fields[1]} boolean for overlays_ignore_restarts.");
+                                continue;
+                            }
+
+                            route.OverlaysIgnoreRestarts = overlaysIgnoreRestarts;
+                        }
+                        break;
                     default:
                         {
-                            Logging.LogWarning($"Line {lineNumber}: Unrecognized effect {fields[0]}.");
+                            Logging.LogWarning($"Line {lineNumber}: Unrecognized route effect / setting {fields[0]}.");
                             continue;
                         }
                 }

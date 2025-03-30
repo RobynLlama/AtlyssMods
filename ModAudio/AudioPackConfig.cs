@@ -1,6 +1,5 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Schema;
-using UnityEngine;
 
 namespace Marioalexsan.ModAudio;
 
@@ -123,6 +122,14 @@ public class AudioPackConfig
         /// </summary>
         [JsonProperty("relative_overlay_effects", Required = Required.DisallowNull)]
         public bool RelativeOverlayEffects { get; set; } = false;
+
+        /// <summary>
+        /// If true, overlay effects (volume, pitch, etc.) will not be played again if the audio source has been restarted while playing.
+        /// If false, overlay effects will play on every playthrough, including restarts.
+        /// This may be helpful to deal with sources that are played multiple times in the same frame.
+        /// </summary>
+        [JsonProperty("overlays_ignore_restarts", Required = Required.DisallowNull)]
+        public bool OverlaysIgnoreRestarts { get; set; } = false;
 
         /// <summary>
         /// A list of clips that will be affected by this route.

@@ -1,5 +1,4 @@
 ﻿using UnityEngine;
-using static Marioalexsan.ModAudio.AudioPackConfig;
 
 namespace Marioalexsan.ModAudio;
 
@@ -13,8 +12,11 @@ public class AudioPack
 
     public List<AudioClipLoader.IAudioStream> OpenStreams { get; } = []; // Only touch this if you plan on cleaning up the pack
 
-    public Dictionary<string, Func<AudioClip>> DelayedLoadClips { get; } = [];
-    public Dictionary<string, AudioClip> LoadedClips { get; } = [];
+    public Dictionary<string, AudioClip> ReadyClips { get; } = [];
+
+    // These clips are loaded / streamed when needed
+    public Dictionary<string, Func<AudioClip>> PendingClipsToLoad { get; } = [];
+    public Dictionary<string, Func<AudioClip>> PendingClipsToStream { get; } = [];
 
     public bool IsUserPack()
     {
@@ -24,12 +26,20 @@ public class AudioPack
 
     public bool TryGetReadyClip(string name, out AudioClip clip)
     {
-        if (LoadedClips.TryGetValue(name, out clip))
+        if (ReadyClips.TryGetValue(name, out clip))
             return true;
 
-        if (DelayedLoadClips.TryGetValue(name, out var loader))
+        if (PendingClipsToStream.TryGetValue(name, out var streamer))
         {
-            clip = LoadedClips[name] = loader();
+            PendingClipsToStream.Remove(name);
+            clip = ReadyClips[name] = streamer();
+            return true;
+        }
+
+        if (PendingClipsToLoad.TryGetValue(name, out var loader))
+        {
+            PendingClipsToLoad.Remove(name);
+            clip = ReadyClips[name] = loader();
             return true;
         }
 

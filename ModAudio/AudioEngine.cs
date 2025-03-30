@@ -1,6 +1,4 @@
-﻿using Marioalexsan.ModAudio.HarmonyPatches;
-using Mono.Cecil;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace Marioalexsan.ModAudio;
 
@@ -9,12 +7,14 @@ internal static class AudioEngine
     private struct SourceState
     {
         // Previous state
-        public AudioClip OriginalClip;
+        public AudioClip Clip;
         public float Volume;
         public float Pitch;
 
         // (supposedly) Current state
         public AudioClip AppliedClip;
+        public float AppliedVolume;
+        public float AppliedPitch;
 
         // Flags
         public bool DisableRouting;
@@ -30,6 +30,8 @@ internal static class AudioEngine
     }
 
     private static readonly System.Random RNG = new();
+    private static readonly System.Diagnostics.Stopwatch Watch = new();
+
     private static readonly Dictionary<AudioSource, SourceState> TrackedSources = [];
     private static readonly HashSet<AudioSource> TrackedPlayOnAwakeSources = [];
 
@@ -57,7 +59,7 @@ internal static class AudioEngine
     {
         var trackedData = TrackedSources[source];
 
-        var originalClipName = trackedData.OriginalClip?.name;
+        var originalClipName = trackedData.Clip?.name;
         bool matchesOriginalClip = false;
 
         if (originalClipName != null)
@@ -128,6 +130,8 @@ internal static class AudioEngine
 
     private static void Reload(bool hardReload)
     {
+        Watch.Restart();
+
         try
         {
             Logging.LogInfo("Reloading engine...");
@@ -168,9 +172,8 @@ internal static class AudioEngine
 
             foreach (var source in TrackedSources)
             {
-                SourceCache.Push(source.Key);
-
-                source.Key.clip = source.Value.OriginalClip;
+                // Restore original state
+                source.Key.clip = source.Value.Clip;
                 source.Key.volume = source.Value.Volume;
                 source.Key.pitch = source.Value.Pitch;
             }
@@ -193,6 +196,26 @@ internal static class AudioEngine
                 ModAudio.Plugin.InitializePackConfiguration(); // TODO I wish ModAudio plugin ref wouldn't be here
             }
 
+            Logging.LogInfo("Preloading audio data...");
+            foreach (var pack in AudioPacks)
+            {
+                if (pack.Enabled && pack.PendingClipsToLoad.Count > 0)
+                {
+                    // If a pack is enabled, we should preload all of the in-memory clips
+                    // Opening a ton of streams at the start is not great though, so those remain on-demand
+
+                    var clipsToPreload = pack.PendingClipsToLoad.Keys.ToArray();
+
+                    foreach (var clip in clipsToPreload)
+                    {
+                        _ = pack.TryGetReadyClip(clip, out _);
+                    }
+
+                    Logging.LogInfo($"{pack.Config.Id} - {clipsToPreload.Length} clips preloaded.");
+                }
+            }
+            Logging.LogInfo("Audio data preloaded.");
+
             // Restart audio
             foreach (var audio in UnityEngine.Object.FindObjectsOfType<AudioSource>(true))
             {
@@ -206,8 +229,11 @@ internal static class AudioEngine
         {
             Logging.LogError($"ModAudio crashed in {nameof(Reload)}! Please report this error to the mod developer:");
             Logging.LogError(e.ToString());
-            return;
         }
+
+        Watch.Stop();
+
+        Logging.LogInfo($"Reload took {Watch.ElapsedMilliseconds} milliseconds.");
     }
 
     public static void Update()
@@ -223,14 +249,16 @@ internal static class AudioEngine
                 {
                     if (audio.playOnAwake)
                     {
-                        if (!TrackedPlayOnAwakeSources.Contains(audio) && audio.isActiveAndEnabled)
+                        // This is to detect playOnAwake audio sources that have been played
+                        // directly by the engine and not via the script API
+
+                        if (!TrackedPlayOnAwakeSources.Contains(audio) && audio.isActiveAndEnabled && audio.isPlaying)
                         {
-                            TrackedPlayOnAwakeSources.Add(audio);
                             AudioPlayed(audio);
                         }
-                        else if (TrackedPlayOnAwakeSources.Contains(audio) && !audio.isActiveAndEnabled)
+                        else if (TrackedPlayOnAwakeSources.Contains(audio) && !audio.isActiveAndEnabled && !audio.isPlaying)
                         {
-                            TrackedPlayOnAwakeSources.Remove(audio);
+                            AudioStopped(audio, false);
                         }
                     }
                 }
@@ -296,9 +324,11 @@ internal static class AudioEngine
             TrackedSources.Add(source, new()
             {
                 AppliedClip = source.clip,
-                OriginalClip = source.clip,
+                Clip = source.clip,
                 Pitch = source.pitch,
-                Volume = source.volume
+                Volume = source.volume,
+                AppliedPitch = source.pitch,
+                AppliedVolume = source.volume
             });
         }
     }
@@ -350,6 +380,11 @@ internal static class AudioEngine
     {
         try
         {
+            if (source.playOnAwake)
+            {
+                TrackedPlayOnAwakeSources.Remove(source);
+            }
+
             if (stopOneShots)
             {
                 foreach (var trackedSource in TrackedSources)
@@ -383,7 +418,12 @@ internal static class AudioEngine
             oneShotSource.volume *= volumeScale;
             oneShotSource.clip = clip;
 
-            TrackedSources[oneShotSource] = TrackedSources[oneShotSource] with { OriginalClip = clip, Volume = oneShotSource.volume, AppliedClip = oneShotSource.clip };
+            TrackedSources[oneShotSource] = TrackedSources[oneShotSource] with {
+                Clip = clip,
+                AppliedClip = oneShotSource.clip,
+                Volume = oneShotSource.volume,
+                AppliedVolume = oneShotSource.volume,
+            };
 
             oneShotSource.Play();
 
@@ -432,9 +472,9 @@ internal static class AudioEngine
         if (!ModAudio.Plugin.LogVoice.Value && groupName == "voice")
             return;
 
-        var originalClipName = TrackedSources[source].OriginalClip?.name ?? "(null)";
+        var originalClipName = TrackedSources[source].Clip?.name ?? "(null)";
         var currentClipName = source.clip?.name ?? "(null)";
-        var clipChanged = TrackedSources[source].OriginalClip != source.clip;
+        var clipChanged = TrackedSources[source].Clip != source.clip;
 
         if (TrackedSources[source].JustUsedDefaultClip)
         {
@@ -443,10 +483,10 @@ internal static class AudioEngine
         }
 
         var originalVolume = TrackedSources[source].Volume;
-        var currentVolume = source.volume;
+        var currentVolume = TrackedSources[source].AppliedVolume;
 
         var originalPitch = TrackedSources[source].Pitch;
-        var currentPitch = source.pitch;
+        var currentPitch = TrackedSources[source].AppliedPitch;
 
         var clipDisplay = clipChanged ? $"{originalClipName} > {currentClipName}" : originalClipName;
         var volumeDisplay = originalVolume != currentVolume ? $"{originalVolume:F2} > {currentVolume:F2}" : $"{originalVolume:F2}";
@@ -467,6 +507,11 @@ internal static class AudioEngine
     {
         try
         {
+            if (source.playOnAwake)
+            {
+                TrackedPlayOnAwakeSources.Add(source);
+            }
+
             var wasPlaying = source.isPlaying;
 
             if (!Route(source))
@@ -504,6 +549,8 @@ internal static class AudioEngine
 
     private static bool Route(AudioSource source)
     {
+        bool sourceWouldRestart = source.isPlaying;
+
         TrackSource(source);
         var trackedData = TrackedSources[source];
 
@@ -512,11 +559,39 @@ internal static class AudioEngine
 
         if (source.clip != trackedData.AppliedClip)
         {
-            // Restore previous modifiers and track new clip
-            source.volume = trackedData.Volume;
-            source.pitch = trackedData.Pitch;
+            TrackedSources[source] = TrackedSources[source] with { 
+                Clip = source.clip,
+                AppliedClip = source.clip
+            };
 
-            TrackedSources[source] = TrackedSources[source] with { OriginalClip = source.clip, AppliedClip = source.clip };
+            if (Math.Abs(source.volume - trackedData.AppliedVolume) >= 0.005)
+            {
+                // Volume must have been changed externally, set it as new original volume
+                TrackedSources[source] = TrackedSources[source] with {
+                    Volume = source.volume,
+                    AppliedVolume = source.volume
+                };
+            }
+            else
+            {
+                // Restore original volume
+                source.volume = trackedData.Volume;
+            }
+
+            if (Math.Abs(source.pitch - trackedData.AppliedPitch) >= 0.005)
+            {
+                // Pitch must have been changed externally, set it as new original pitch
+                TrackedSources[source] = TrackedSources[source] with
+                {
+                    Pitch = source.pitch,
+                    AppliedPitch = source.pitch
+                };
+            }
+            else
+            {
+                // Restore original volume
+                source.pitch = trackedData.Pitch;
+            }
         }
 
         if (trackedData.JustRouted || trackedData.DisableRouting)
@@ -556,6 +631,12 @@ internal static class AudioEngine
                 source.pitch = replacementRoute.Route.Pitch;
             }
 
+            TrackedSources[source] = TrackedSources[source] with
+            {
+                AppliedPitch = source.pitch,
+                AppliedVolume = source.volume
+            };
+
             // Apply replacement if needed
 
             if (replacementRoute.Route.ReplacementClips.Count > 0)
@@ -566,7 +647,7 @@ internal static class AudioEngine
 
                 if (randomSelection.Name == "___default___")
                 {
-                    destinationClip = TrackedSources[source].OriginalClip;
+                    destinationClip = TrackedSources[source].Clip;
                     TrackedSources[source] = TrackedSources[source] with { JustUsedDefaultClip = true };
                 }
                 else if (randomSelection.Name == "___nothing___")
@@ -580,10 +661,15 @@ internal static class AudioEngine
 
                 if (destinationClip != null)
                 {
-                    TrackedSources[source] = TrackedSources[source] with { AppliedClip = destinationClip, JustRouted = true };
-
                     source.volume *= randomSelection.Volume;
                     source.pitch *= randomSelection.Pitch;
+
+                    TrackedSources[source] = TrackedSources[source] with { 
+                        AppliedClip = destinationClip, 
+                        JustRouted = true,
+                        AppliedPitch = source.pitch,
+                        AppliedVolume = source.volume
+                    };
 
                     if (source.isPlaying)
                         source.Stop();
@@ -603,12 +689,17 @@ internal static class AudioEngine
         {
             foreach (var route in pack.Config.Routes)
             {
+                if (route.OverlaysIgnoreRestarts && sourceWouldRestart)
+                    continue;
+
                 if (route.OverlayClips.Count > 0 && IsValidTarget(source, route) && (!route.LinkOverlayAndReplacement || replacementRoute.Route == route)) 
                     overlays.Add((pack, route));
             }
         }
 
-        if (overlays.Count > 0)
+        // Note: Overlays should not be able to trigger other overlays
+        // Otherwise you can easily create infinite loops
+        if (overlays.Count > 0 && !TrackedSources[source].IsOverlay)
         {
             foreach (var (Pack, Route) in overlays)
             {
@@ -637,7 +728,9 @@ internal static class AudioEngine
                     {
                         Pitch = oneShotSource.pitch,
                         Volume = oneShotSource.volume,
-                        OriginalClip = oneShotSource.clip,
+                        AppliedPitch = oneShotSource.pitch,
+                        AppliedVolume = oneShotSource.volume,
+                        Clip = oneShotSource.clip,
                         AppliedClip = oneShotSource.clip,
                         IsOverlay = true,
                         DisableRouting = true

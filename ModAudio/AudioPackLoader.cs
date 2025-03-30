@@ -1,6 +1,4 @@
 ﻿using BepInEx;
-using BepInEx.Logging;
-using System.IO;
 using UnityEngine;
 
 namespace Marioalexsan.ModAudio;
@@ -11,6 +9,7 @@ public static class AudioPackLoader
 
     public const string AudioPackConfigName = "modaudio.config.json";
     public const string RoutesConfigName = "__routes.txt";
+
     public const int FileSizeLimitForLoading = 1024 * 1024;
 
     public static string ReplaceRootPath(string path)
@@ -173,7 +172,18 @@ public static class AudioPackLoader
         Logging.LogInfo(Texts.LoadingPack(path), ModAudio.Plugin.LogPackLoading);
 
         using var stream = File.OpenRead(path);
-        AudioPackConfig config = AudioPackConfig.ReadJSON(stream);
+
+        AudioPackConfig config;
+        try
+        {
+            config = AudioPackConfig.ReadJSON(stream);
+        }
+        catch (Exception e)
+        {
+            Logging.LogWarning($"Failed to read audio pack config for {ReplaceRootPath(path)}.");
+            Logging.LogWarning(e.ToString());
+            return null;
+        }
 
         AudioPack pack = new()
         {
@@ -266,7 +276,7 @@ public static class AudioPackLoader
     {
         foreach (var clipData in pack.Config.CustomClips)
         {
-            if (pack.LoadedClips.Any(x => x.Value.name == clipData.Name))
+            if (pack.ReadyClips.Any(x => x.Value.name == clipData.Name))
             {
                 Logging.LogWarning(Texts.DuplicateClipId(clipData.Path, clipData.Name));
                 continue;
@@ -316,8 +326,7 @@ public static class AudioPackLoader
 
                 if (useStreaming)
                 {
-                    // Opening a ton of streams at the start is not great, plus it adds a sizeable amount of load time if you have a lot of packs
-                    pack.DelayedLoadClips[clipData.Name] = () =>
+                    pack.PendingClipsToStream[clipData.Name] = () =>
                     {
                         var clip = AudioClipLoader.StreamFromFile(clipData.Name, clipPath, clipData.Volume, out var stream);
                         pack.OpenStreams.Add(stream);
@@ -326,7 +335,10 @@ public static class AudioPackLoader
                 }
                 else
                 {
-                    pack.LoadedClips[clipData.Name] = AudioClipLoader.LoadFromFile(clipData.Name, clipPath, clipData.Volume);
+                    pack.PendingClipsToLoad[clipData.Name] = () =>
+                    {
+                        return AudioClipLoader.LoadFromFile(clipData.Name, clipPath, clipData.Volume);
+                    };
                 }
             }
             catch (Exception e)
@@ -359,7 +371,7 @@ public static class AudioPackLoader
 
             var name = Path.GetFileNameWithoutExtension(file);
 
-            if (pack.LoadedClips.ContainsKey(name))
+            if (pack.ReadyClips.ContainsKey(name))
             {
                 Logging.LogWarning(Texts.DuplicateClipSkipped(file, name));
                 continue;
@@ -373,8 +385,7 @@ public static class AudioPackLoader
 
                 if (useStreaming)
                 {
-                    // Opening a ton of streams at the start is not great, plus it adds a sizeable amount of load time if you have a lot of packs
-                    pack.DelayedLoadClips[name] = () =>
+                    pack.PendingClipsToStream[name] = () =>
                     {
                         var clip = AudioClipLoader.StreamFromFile(name, file, 1f, out var stream);
                         pack.OpenStreams.Add(stream);
@@ -383,7 +394,10 @@ public static class AudioPackLoader
                 }
                 else
                 {
-                    pack.LoadedClips[name] = AudioClipLoader.LoadFromFile(name, file, 1f);
+                    pack.PendingClipsToLoad[name] = () =>
+                    {
+                        return AudioClipLoader.LoadFromFile(name, file, 1f);
+                    };
                 }
             }
             catch (Exception e)

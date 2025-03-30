@@ -1,6 +1,4 @@
-﻿using System.IO;
-
-namespace Marioalexsan.ModAudio;
+﻿namespace Marioalexsan.ModAudio;
 
 public static class Texts
 {
@@ -64,7 +62,7 @@ public static class Texts
         => $"Loading pack from {AudioPackLoader.ReplaceRootPath(path)}";
 
     public static string PackLoaded(AudioPack pack)
-        => $"Loaded pack {pack.Config.Id} with {pack.Config.Routes.Count} routes, {pack.LoadedClips.Count} loaded clips, {pack.DelayedLoadClips.Count} streamed clips";
+        => $"Loaded pack {pack.Config.Id} with {pack.Config.Routes.Count} routes, {pack.PendingClipsToStream.Count} clips to streams and {pack.PendingClipsToLoad.Count} clips to load";
 
     public static string LoadingClip(string path, string name, bool useStreaming)
         => $"{(useStreaming ? "Streaming" : "Loading")} clip {name} from {AudioPackLoader.ReplaceRootPath(path)}";
