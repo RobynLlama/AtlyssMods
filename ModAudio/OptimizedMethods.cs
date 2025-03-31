@@ -1,4 +1,6 @@
-﻿using System.Runtime.CompilerServices;
+﻿using Newtonsoft.Json.Linq;
+using System.Buffers;
+using System.Runtime.CompilerServices;
 
 namespace Marioalexsan.ModAudio;
 
@@ -23,5 +25,45 @@ internal static class OptimizedMethods
                 }
             }
         }
+    }
+
+    public delegate void CachedForeachAction<T>(in T value);
+
+    public static void CachedForeach<T>(ICollection<T> enumerable, CachedForeachAction<T> action)
+    {
+        var cache = ArrayPool<T>.Shared.Rent(enumerable.Count);
+        var cacheSize = 0;
+
+        foreach (var value in enumerable)
+        {
+            cache[cacheSize++] = value;
+        }
+
+        for (int i = 0; i < cacheSize; i++)
+        {
+            action(cache[i]);
+        }
+
+        ArrayPool<T>.Shared.Return(cache);
+    }
+
+    public delegate void CachedForeachAction<T, V>(in T value, in V context);
+
+    public static void CachedForeach<T, V>(ICollection<T> enumerable, in V context, CachedForeachAction<T, V> action)
+    {
+        var cache = ArrayPool<T>.Shared.Rent(enumerable.Count);
+        var cacheSize = 0;
+
+        foreach (var value in enumerable)
+        {
+            cache[cacheSize++] = value;
+        }
+
+        for (int i = 0; i < cacheSize; i++)
+        {
+            action(cache[i], in context);
+        }
+
+        ArrayPool<T>.Shared.Return(cache);
     }
 }

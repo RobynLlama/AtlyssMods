@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Diagnostics;
+using UnityEngine;
 
 namespace Marioalexsan.ModAudio;
 
@@ -35,8 +36,6 @@ internal static class AudioEngine
 
     private static readonly Dictionary<AudioSource, SourceState> TrackedSources = [];
     private static readonly HashSet<AudioSource> TrackedPlayOnAwakeSources = [];
-
-    private static readonly Stack<AudioSource> SourceCache = new Stack<AudioSource>(256);
 
     public static List<AudioPack> AudioPacks { get; } = [];
     public static IEnumerable<AudioPack> EnabledPacks => AudioPacks.Where(x => x.Enabled);
@@ -142,25 +141,24 @@ internal static class AudioEngine
         {
             Logging.LogInfo("Reloading engine...");
 
+            // I like cleaning audio sources
+            CleanupSources();
+
             if (hardReload)
             {
                 // Get rid of one-shots forcefully
-                SourceCache.Clear();
 
-                foreach (var source in TrackedSources)
-                {
-                    if (source.Value.IsOneShotSource)
+                OptimizedMethods.CachedForeach(
+                    TrackedSources,
+                    static (in KeyValuePair<AudioSource, SourceState> source) =>
                     {
-                        SourceCache.Push(source.Key);
+                        if (source.Value.IsOneShotSource)
+                        {
+                            TrackedSources.Remove(source.Key);
+                            UnityEngine.Object.Destroy(source.Key);
+                        }
                     }
-                }
-
-                while (SourceCache.Count > 0)
-                {
-                    var source = SourceCache.Pop();
-                    TrackedSources.Remove(source);
-                    UnityEngine.Object.Destroy(source);
-                }
+                );
             }
 
             // Restore previous state
@@ -176,12 +174,15 @@ internal static class AudioEngine
                 }
             }
 
+            // Restore original state
             foreach (var source in TrackedSources)
             {
-                // Restore original state
-                source.Key.clip = source.Value.Clip;
-                source.Key.volume = source.Value.Volume;
-                source.Key.pitch = source.Value.Pitch;
+                if (source.Key != null)
+                {
+                    source.Key.clip = source.Value.Clip;
+                    source.Key.volume = source.Value.Volume;
+                    source.Key.pitch = source.Value.Pitch;
+                }
             }
 
             TrackedSources.Clear();
@@ -246,84 +247,64 @@ internal static class AudioEngine
     {
         try
         {
-            // Check play on awake sounds
-            bool checkPlayOnAwake = true;
-
-            if (checkPlayOnAwake)
+            foreach (var audio in UnityEngine.Object.FindObjectsOfType<AudioSource>(true))
             {
-                foreach (var audio in UnityEngine.Object.FindObjectsOfType<AudioSource>(true))
+                if (audio.playOnAwake)
                 {
-                    if (audio.playOnAwake)
-                    {
-                        // This is to detect playOnAwake audio sources that have been played
-                        // directly by the engine and not via the script API
+                    // This is to detect playOnAwake audio sources that have been played
+                    // directly by the engine and not via the script API
 
-                        if (!TrackedPlayOnAwakeSources.Contains(audio) && audio.isActiveAndEnabled && audio.isPlaying)
-                        {
-                            AudioPlayed(audio);
-                        }
-                        else if (TrackedPlayOnAwakeSources.Contains(audio) && !audio.isActiveAndEnabled && !audio.isPlaying)
-                        {
-                            AudioStopped(audio, false);
-                        }
+                    if (!TrackedPlayOnAwakeSources.Contains(audio) && audio.isActiveAndEnabled && audio.isPlaying)
+                    {
+                        AudioPlayed(audio);
+                    }
+                    else if (TrackedPlayOnAwakeSources.Contains(audio) && !audio.isActiveAndEnabled && !audio.isPlaying)
+                    {
+                        AudioStopped(audio, false);
                     }
                 }
             }
 
-            // Cleanup dead play on awake sounds
-            SourceCache.Clear();
-
-            foreach (var source in TrackedPlayOnAwakeSources)
-            {
-                if (source == null)
-                    SourceCache.Push(source);
-            }
-
-            while (SourceCache.Count > 0)
-            {
-                TrackedPlayOnAwakeSources.Remove(SourceCache.Pop());
-            }
-
-            // Cleanup stale stuff
-            SourceCache.Clear();
-
-            foreach (var source in TrackedSources)
-            {
-                if (source.Key == null)
-                    SourceCache.Push(source.Key);
-            }
-
-            while (SourceCache.Count > 0)
-            {
-                TrackedSources.Remove(SourceCache.Pop());
-            }
-
-            // Cleanup dead one shot sources
-            SourceCache.Clear();
-
-            foreach (var source in TrackedSources)
-            {
-                if (source.Value.IsOneShotSource && !source.Key.isPlaying)
-                    SourceCache.Push(source.Key);
-            }
-
-            while (SourceCache.Count > 0)
-            {
-                var source = SourceCache.Pop();
-                TrackedSources.Remove(source);
-
-                if (source != null)
-                {
-                    AudioStopped(source, false);
-                    UnityEngine.Object.Destroy(source);
-                }
-            }
+            CleanupSources();
         }
         catch (Exception e)
         {
             Logging.LogError($"ModAudio crashed in {nameof(Update)}! Please report this error to the mod developer:");
             Logging.LogError(e.ToString());
         }
+    }
+
+    private static void CleanupSources()
+    {
+        // Cleanup dead play on awake sounds
+        OptimizedMethods.CachedForeach(
+            TrackedPlayOnAwakeSources,
+            static (in AudioSource source) =>
+            {
+                if (source == null)
+                {
+                    TrackedPlayOnAwakeSources.Remove(source);
+                }
+            }
+        );
+
+        // Cleanup stale stuff
+        OptimizedMethods.CachedForeach(
+            TrackedSources,
+            static (in KeyValuePair<AudioSource, SourceState> source) =>
+            {
+                if (source.Key == null)
+                {
+                    TrackedSources.Remove(source.Key);
+                }
+                else if (source.Value.IsOneShotSource && !source.Key.isPlaying)
+                {
+                    TrackedSources.Remove(source.Key);
+                    AudioStopped(source.Key, false);
+                    UnityEngine.Object.Destroy(source.Key);
+                }
+            }
+        );
     }
 
     private static void TrackSource(AudioSource source)
@@ -415,7 +396,8 @@ internal static class AudioEngine
             oneShotSource.volume *= volumeScale;
             oneShotSource.clip = clip;
 
-            TrackedSources[oneShotSource] = TrackedSources[oneShotSource] with {
+            TrackedSources[oneShotSource] = TrackedSources[oneShotSource] with
+            {
                 Clip = clip,
                 AppliedClip = oneShotSource.clip,
                 Volume = oneShotSource.volume,
@@ -522,7 +504,8 @@ internal static class AudioEngine
                 return true;
             }
 
-            TrackedSources[source] = TrackedSources[source] with {
+            TrackedSources[source] = TrackedSources[source] with
+            {
                 JustRouted = false,
                 WasStoppedOrDisabled = false
             };
@@ -565,11 +548,17 @@ internal static class AudioEngine
 
             if (stopOneShots)
             {
-                foreach (var trackedSource in TrackedSources)
-                {
-                    if (trackedSource.Value.IsOneShotSource && trackedSource.Value.OneShotOrigin == source && trackedSource.Key != null && trackedSource.Key.isPlaying)
-                        trackedSource.Key.Stop();
-                }
+                OptimizedMethods.CachedForeach(
+                    TrackedSources,
+                    source,
+                    static (in KeyValuePair<AudioSource, SourceState> trackedSource, in AudioSource stoppedSource) =>
+                    {
+                        if (trackedSource.Value.IsOneShotSource && trackedSource.Value.OneShotOrigin == stoppedSource && trackedSource.Key != null && trackedSource.Key.isPlaying)
+                        {
+                            trackedSource.Key.Stop();
+                        }
+                    }
+                );
             }
 
             TrackedSources[source] = TrackedSources[source] with { WasStoppedOrDisabled = true };
@@ -597,7 +586,8 @@ internal static class AudioEngine
 
         if (source.clip != trackedData.AppliedClip)
         {
-            TrackedSources[source] = TrackedSources[source] with { 
+            TrackedSources[source] = TrackedSources[source] with
+            {
                 Clip = source.clip,
                 AppliedClip = source.clip
             };
@@ -605,7 +595,8 @@ internal static class AudioEngine
             if (Math.Abs(source.volume - trackedData.AppliedVolume) >= 0.005)
             {
                 // Volume must have been changed externally, set it as new original volume
-                TrackedSources[source] = TrackedSources[source] with {
+                TrackedSources[source] = TrackedSources[source] with
+                {
                     Volume = source.volume,
                     AppliedVolume = source.volume
                 };
@@ -702,8 +693,9 @@ internal static class AudioEngine
                     source.volume *= randomSelection.Volume;
                     source.pitch *= randomSelection.Pitch;
 
-                    TrackedSources[source] = TrackedSources[source] with { 
-                        AppliedClip = destinationClip, 
+                    TrackedSources[source] = TrackedSources[source] with
+                    {
+                        AppliedClip = destinationClip,
                         JustRouted = true,
                         AppliedPitch = source.pitch,
                         AppliedVolume = source.volume
@@ -732,7 +724,7 @@ internal static class AudioEngine
                 if (route.OverlaysIgnoreRestarts && !(TrackedSources[source].WasStoppedOrDisabled || !source.isPlaying))
                     continue;
 
-                if (route.OverlayClips.Count > 0 && IsValidTarget(source, route) && (!route.LinkOverlayAndReplacement || replacementRoute.Route == route)) 
+                if (route.OverlayClips.Count > 0 && IsValidTarget(source, route) && (!route.LinkOverlayAndReplacement || replacementRoute.Route == route))
                     overlays.Add((pack, route));
             }
         }
@@ -794,7 +786,7 @@ internal static class AudioEngine
 
         for (int i = 0; i < routes.Count; i++)
             totalWeight += routes[i].Route.ReplacementWeight;
-        
+
         var selectedIndex = -1;
 
         var randomValue = RNG.NextDouble() * totalWeight;
