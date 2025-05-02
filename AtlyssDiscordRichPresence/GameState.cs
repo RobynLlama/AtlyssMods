@@ -1,25 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using UnityEngine;
 
 namespace Marioalexsan.AtlyssDiscordRichPresence;
 
-// TODO: Player race
-// TODO: Player class
-
 public class GameState
 {
-    public string ReplaceVars(string input)
-    {
-        foreach (var kvp in _keys)
-        {
-            input = input.Replace($"{{{kvp.Key}}}", kvp.Value());
-        }
-
-        return input;
-    }
-
     private readonly Dictionary<string, Func<string>> _keys;
+
+    public IEnumerable<KeyValuePair<string, Func<string>>> GetStates() => _keys.AsEnumerable();
 
     public GameState()
     {
@@ -75,13 +62,19 @@ public class GameState
     public int ExperienceForNextLevel { get; set; }
     public int ExperiencePercentage => ExperienceForNextLevel != 0 ? Experience * 100 / ExperienceForNextLevel : 0;
 
-    public string PlayerName { get; set; }
-    public string PlayerRace { get; set; }
-    public string PlayerClass { get; set; }
+    public string PlayerName { get; set; } = "";
+    public string PlayerRace { get; set; } = "";
+    public string PlayerClass { get; set; } = "";
 
-    public string WorldArea { get; set; }
+    public string WorldArea { get; set; } = "";
+    public Vector3 Position { get; set; }
+    public Vector3 LastSignificantPosition { get; set; }
+    public DateTime LastSignificantPositionUpdate { get; set; } = DateTime.Now;
+    public bool IsIdle => DateTime.Now - LastSignificantPositionUpdate > TimeSpan.FromSeconds(10);
 
-    // Not configurable / displayable
+    public string ServerName { get; set; } = "";
+
+    // Not configurable / displayable directly
 
     public bool InArenaCombat { get; set; }
     public bool InBossCombat { get; set; }
@@ -89,13 +82,10 @@ public class GameState
     public bool InMultiplayer { get; set; }
     public int Players { get; set; }
     public int MaxPlayers { get; set; }
-    public string ServerName { get; set; }
+    public string ServerJoinId { get; set; } = "";
 
     public void UpdateData(MapInstance area)
     {
-        if (area == null)
-            return;
-
         WorldArea = area._mapName;
     }
 
@@ -118,6 +108,15 @@ public class GameState
 
         PlayerName = player.Network_nickname;
         PlayerRace = player._pVisual._playerAppearanceStruct._setRaceTag ?? "";
+
+        Position = player.transform.position;
+
+        // Should be a few steps or so in terms of distance
+        if (Vector3.Distance(Position, LastSignificantPosition) > 5)
+        {
+            LastSignificantPosition = Position;
+            LastSignificantPositionUpdate = DateTime.Now;
+        }
 
         if ((bool)player._pStats._class)
         {

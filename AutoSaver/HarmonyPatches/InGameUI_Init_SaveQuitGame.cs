@@ -7,6 +7,6 @@ static class InGameUI_Init_SaveQuitGame
 {
     static void Prefix()
     {
-        AutoSaverMod.Instance.GameExited();
+        AutoSaver.Plugin.GameExited();
     }
 }

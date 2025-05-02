@@ -1,138 +1,34 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <!-- Generic assembly info. -->
     <PropertyGroup>
-        <TargetFramework>net472</TargetFramework>
+        <DebugSymbols>true</DebugSymbols>
+        <DebugType>embedded</DebugType>
+        <TargetFramework>netstandard2.1</TargetFramework>
         <ThunderstoreName>AllowAnyNames</ThunderstoreName>
+        <Product>AllowAnyNames</Product>
         <AssemblyName>Marioalexsan.AllowAnyNames</AssemblyName>
         <RootNamespace>Marioalexsan.AllowAnyNames</RootNamespace>
-        <Product>AllowAnyNames</Product>
-        <Version>1.0.0</Version>
+        <Version>1.1.0</Version>
+        <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>latest</LangVersion>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Platforms>AnyCPU;x64</Platforms>
     </PropertyGroup>
 
-    <!-- Uncomment this if you use BepInEx.AutoHookGenPatcher MMHOOK -->
-    <!--
     <ItemGroup>
-        <Reference Include="MMHOOK_Assembly-CSharp">
-            <HintPath>$(ATLYSS_PATH)\BepInEx\plugins\MMHOOK\Managed\MMHOOK_Assembly-CSharp.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-    </ItemGroup>
-    -->
-
-    <!-- Publicizer for accessing private identifiers in ATLYSS's assembly. -->
-    <ItemGroup>
+        <PackageReference Include="BepInEx.Analyzers" PrivateAssets="all" Version="1.*" />
+        <PackageReference Include="BepInEx.Core" Version="5.4.*" />
         <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.2" PrivateAssets="all" />
-    </ItemGroup>
-
-    <!-- ATLYSS_Data/Managed assemblies. -->
-    <ItemGroup>
-        <!-- Atlyss assembly. We're also publicizing this with BepInEx.AssemblyPublicizer. -->
-        <Reference Include="Assembly-CSharp" Publicize="true">
-            <HintPath>$(ATLYSS_MANAGED)\Assembly-CSharp.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-
-        <!-- Third party modules. -->
-        <Reference Include="com.rlabrecque.steamworks.net">
-            <HintPath>$(ATLYSS_MANAGED)\com.rlabrecque.steamworks.net.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="FizzySteamworks">
-            <HintPath>$(ATLYSS_MANAGED)\FizzySteamworks.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="Mirror">
-            <HintPath>$(ATLYSS_MANAGED)\Mirror.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-
-        <!-- Unity. Add any other assemblies as needed, not all of them were listed here. -->
-        <Reference Include="UnityEngine">
-            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="UnityEngine.AssetBundleModule">
-            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.AssetBundleModule.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="UnityEngine.AudioModule">
-            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.AudioModule.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="UnityEngine.JSONSerializeModule">
-            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.JSONSerializeModule.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="UnityEngine.CoreModule">
-            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.CoreModule.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="UnityEngine.UI">
-            <HintPath>$(ATLYSS_MANAGED)\UnityEngine.UI.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-    </ItemGroup>
-
-    <!-- BepInEx/core assemblies. -->
-    <ItemGroup>
-        <!-- BepInEx -->
-        <Reference Include="BepInEx">
-            <HintPath>$(ATLYSS_BEPINEX)\BepInEx.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="BepInEx.Harmony">
-            <HintPath>$(ATLYSS_BEPINEX)\BepInEx.Harmony.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="BepInEx.Preloader">
-            <HintPath>$(ATLYSS_BEPINEX)\BepInEx.Preloader.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-
-        <!-- Harmony -->
-        <Reference Include="0Harmony20">
-            <HintPath>$(ATLYSS_BEPINEX)\0Harmony20.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="HarmonyXInterop">
-            <HintPath>$(ATLYSS_BEPINEX)\HarmonyXInterop.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-
-        <!-- Mono -->
-        <Reference Include="Mono.Cecil">
-            <HintPath>$(ATLYSS_BEPINEX)\Mono.Cecil.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="Mono.Cecil.Mdb">
-            <HintPath>$(ATLYSS_BEPINEX)\Mono.Cecil.Mdb.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="Mono.Cecil.Pdb">
-            <HintPath>$(ATLYSS_BEPINEX)\Mono.Cecil.Pdb.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="Mono.Cecil.Rocks">
-            <HintPath>$(ATLYSS_BEPINEX)\Mono.Cecil.Rocks.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-
-        <!-- MonoMod -->
-        <Reference Include="MonoMod">
-            <HintPath>$(ATLYSS_BEPINEX)\MonoMod.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="MonoMod.RuntimeDetour">
-            <HintPath>$(ATLYSS_BEPINEX)\MonoMod.RuntimeDetour.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="MonoMod.Utils">
-            <HintPath>$(ATLYSS_BEPINEX)\MonoMod.Utils.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
+        <PackageReference Include="UnityEngine.Modules" Version="2021.3.16">
+            <IncludeAssets>all</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <Reference Include="$(ATLYSS_MANAGED)/Assembly-CSharp.dll" Publicize="true" Private="False" />
+        <Reference Include="$(ATLYSS_MANAGED)/UnityEngine.UI.dll" Private="False" />
+        <Reference Include="$(ATLYSS_MANAGED)/Newtonsoft.Json.dll" Private="False" />
+        <Reference Include="$(ATLYSS_MANAGED)/Mirror.dll" Private="False" />
     </ItemGroup>
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
         <Exec Command="python ../_Utils/pack_game.py $(MSBuildProjectName)/" ContinueOnError="true" />

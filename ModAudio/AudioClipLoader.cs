@@ -25,6 +25,16 @@ public static class AudioClipLoader
     public static readonly string[] SupportedExtensions = [.. SupportedStreamExtensions, .. SupportedLoadExtensions];
 
     /// <summary>
+    /// Creates an empty clip with the given name and duration.
+    /// </summary>
+    public static AudioClip GenerateEmptyClip(string name, int samples)
+    {
+        var clip = AudioClip.Create(name, samples, 1, 44100, false);
+        clip.SetData(new float[samples], 0);
+        return clip;
+    }
+
+    /// <summary>
     /// Loads an audio clip in its entirety from the disk.
     /// </summary>
     public static AudioClip LoadFromFile(string clipName, string path, float volumeModifier)
@@ -63,7 +73,7 @@ public static class AudioClipLoader
     /// </summary>
     public static AudioClip StreamFromFile(string clipName, string path, float volumeModifier, out IAudioStream openedStream)
     {
-        IAudioStream stream = null;
+        IAudioStream? stream = null;
 
         if (path.EndsWith(".ogg"))
         {

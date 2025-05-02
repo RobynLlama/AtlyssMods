@@ -7,6 +7,6 @@ static class MainMenuManager_Set_MenuCondition
 {
     static void Postfix(MainMenuManager __instance)
     {
-        AtlyssDiscordRichPresenceMod.Instance.MainMenuManager_Set_MenuCondition(__instance);
+        AtlyssDiscordRichPresence.Plugin.MainMenuManager_Set_MenuCondition(__instance);
     }
 }

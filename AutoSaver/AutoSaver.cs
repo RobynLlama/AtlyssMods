@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
-using System.Security;
-using System.Security.Permissions;
+﻿using System.Globalization;
 using BepInEx;
 using BepInEx.Bootstrap;
 using BepInEx.Logging;
@@ -11,21 +6,17 @@ using HarmonyLib;
 using Marioalexsan.AutoSaver.HarmonyReversePatches;
 using UnityEngine;
 
-#pragma warning disable CS0618
-
-[module: UnverifiableCode]
-[assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification = true)]
-
 namespace Marioalexsan.AutoSaver;
 
 [BepInPlugin(ModInfo.PLUGIN_GUID, ModInfo.PLUGIN_NAME, ModInfo.PLUGIN_VERSION)]
-public class AutoSaverMod : BaseUnityPlugin
+public class AutoSaver : BaseUnityPlugin
 {
     public const string MoreBankTabsIndentifier = "com.16mb.morebanktabs";
 
-    public new ManualLogSource Logger { get; private set; }
+    public static AutoSaver Plugin => _plugin ?? throw new InvalidOperationException($"{nameof(AutoSaver)} hasn't been initialized yet. Either wait until initialization, or check via ChainLoader instead.");
+    private static AutoSaver? _plugin;
 
-    public static AutoSaverMod Instance { get; private set; }
+    public new ManualLogSource Logger { get; private set; }
 
     private Harmony _harmony;
     private TimeSpan _elapsedTime;
@@ -38,12 +29,16 @@ public class AutoSaverMod : BaseUnityPlugin
 
     private readonly char[] BannedChars = [.. Path.GetInvalidPathChars(), .. Path.GetInvalidFileNameChars()];
 
+    public AutoSaver()
+    {
+        _plugin = this;
+        Logger = base.Logger;
+        _harmony = new Harmony(ModInfo.PLUGIN_GUID);
+    }
+
     private void Awake()
     {
-        Instance = this;
-        Logger = base.Logger;
         Logger.LogInfo("AutoSaver patching...");
-        _harmony = new Harmony(ModInfo.PLUGIN_GUID);
         _harmony.PatchAll();
 
         Logger.LogInfo("AutoSaver configuring...");
@@ -170,7 +165,8 @@ public class AutoSaverMod : BaseUnityPlugin
 
         for (int i = 0; i < BannedChars.Length; i++)
         {
-            playerName = playerName.Replace($"{BannedChars[i]}", $"_{i}");
+            int codePoint = char.ConvertToUtf32($"{BannedChars[i]}", 0);
+            playerName = playerName.Replace($"{BannedChars[i]}", $"_{codePoint}");
         }
 
         return playerName;

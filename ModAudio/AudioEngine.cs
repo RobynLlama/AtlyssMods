@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace Marioalexsan.ModAudio;
 
@@ -8,12 +7,12 @@ internal static class AudioEngine
     private struct SourceState
     {
         // Previous state
-        public AudioClip Clip;
+        public AudioClip? Clip;
         public float Volume;
         public float Pitch;
 
         // (supposedly) Current state
-        public AudioClip AppliedClip;
+        public AudioClip? AppliedClip;
         public float AppliedVolume;
         public float AppliedPitch;
 
@@ -21,6 +20,7 @@ internal static class AudioEngine
         public bool DisableRouting;
         public bool IsOneShotSource;
         public bool IsOverlay;
+        public bool IsCustomEvent;
 
         // Temporary Flags
         public bool JustRouted;
@@ -28,14 +28,14 @@ internal static class AudioEngine
         public bool WasStoppedOrDisabled;
 
         // Misc
-        public AudioSource OneShotOrigin;
+        public AudioSource? OneShotOrigin;
     }
 
     private static readonly System.Random RNG = new();
     private static readonly System.Diagnostics.Stopwatch Watch = new();
 
-    private static readonly Dictionary<AudioSource, SourceState> TrackedSources = [];
-    private static readonly HashSet<AudioSource> TrackedPlayOnAwakeSources = [];
+    private static readonly Dictionary<AudioSource?, SourceState> TrackedSources = [];
+    private static readonly HashSet<AudioSource?> TrackedPlayOnAwakeSources = [];
 
     public static List<AudioPack> AudioPacks { get; } = [];
     public static IEnumerable<AudioPack> EnabledPacks => AudioPacks.Where(x => x.Enabled);
@@ -44,21 +44,29 @@ internal static class AudioEngine
     {
         get
         {
-            if (_emptyClip == null)
-            {
-                // Setting this too low might cause it to fail for playOnAwake sources
-                // This is due to the detection method in Update(), which relies on scanning audio sources every frame
-                // This is why we need to use a minimum size (a few game frames at least).
-                const int EmptyClipSizeInSamples = 16384; // 0.37 seconds
+            // Setting this too low might cause it to fail for playOnAwake sources
+            // This is due to the detection method in Update(), which relies on scanning audio sources every frame
+            // This is why we need to use a minimum size (a few game frames at least).
 
-                _emptyClip = AudioClip.Create("___nothing___", EmptyClipSizeInSamples, 1, 44100, false);
-                _emptyClip.SetData(new float[EmptyClipSizeInSamples], 0);
-            }
-
-            return _emptyClip;
+            const int EmptyClipSizeInSamples = 16384; // 0.37 seconds
+            return _emptyClip ??= AudioClipLoader.GenerateEmptyClip("___nothing___", EmptyClipSizeInSamples);
         }
     }
-    private static AudioClip _emptyClip;
+    private static AudioClip? _emptyClip;
+
+    public static void PlayCustomEvent(AudioClip clip, AudioSource target)
+    {
+        var source = CreateOneShotFromSource(target);
+
+        source.volume = 1f;
+        source.pitch = 1f;
+        source.panStereo = 0f;
+        source.clip = clip;
+
+        TrackedSources[source] = TrackedSources[source] with { IsCustomEvent = true };
+
+        source.Play();
+    }
 
     private static bool IsValidTarget(AudioSource source, AudioPackConfig.Route route)
     {
@@ -150,7 +158,7 @@ internal static class AudioEngine
 
                 OptimizedMethods.CachedForeach(
                     TrackedSources,
-                    static (in KeyValuePair<AudioSource, SourceState> source) =>
+                    static (in KeyValuePair<AudioSource?, SourceState> source) =>
                     {
                         if (source.Value.IsOneShotSource)
                         {
@@ -279,7 +287,7 @@ internal static class AudioEngine
         // Cleanup dead play on awake sounds
         OptimizedMethods.CachedForeach(
             TrackedPlayOnAwakeSources,
-            static (in AudioSource source) =>
+            static (in AudioSource? source) =>
             {
                 if (source == null)
                 {
@@ -291,7 +299,7 @@ internal static class AudioEngine
         // Cleanup stale stuff
         OptimizedMethods.CachedForeach(
             TrackedSources,
-            static (in KeyValuePair<AudioSource, SourceState> source) =>
+            static (in KeyValuePair<AudioSource?, SourceState> source) =>
             {
                 if (source.Key == null)
                 {
@@ -455,21 +463,27 @@ internal static class AudioEngine
         var currentClipName = source.clip?.name ?? "(null)";
         var clipChanged = TrackedSources[source].Clip != source.clip;
 
+        if (TrackedSources[source].IsCustomEvent && !clipChanged && !ModAudio.Plugin.AlwaysLogCustomEventsPlayed.Value)
+            return; // Skip logging custom events that do nothing (including playing the "default" sound, which is empty)
+
         if (TrackedSources[source].JustUsedDefaultClip)
         {
+            // Needs a special case for display purposes, since the clip name is the same
             clipChanged = true;
             currentClipName = "___default___";
         }
 
         var originalVolume = TrackedSources[source].Volume;
         var currentVolume = TrackedSources[source].AppliedVolume;
+        var volumeChanged = originalVolume != currentVolume;
 
         var originalPitch = TrackedSources[source].Pitch;
         var currentPitch = TrackedSources[source].AppliedPitch;
+        var pitchChanged = originalPitch != currentPitch;
 
         var clipDisplay = clipChanged ? $"{originalClipName} > {currentClipName}" : originalClipName;
-        var volumeDisplay = originalVolume != currentVolume ? $"{originalVolume:F2} > {currentVolume:F2}" : $"{originalVolume:F2}";
-        var pitchDisplay = originalPitch != currentPitch ? $"{originalPitch:F2} > {currentPitch:F2}" : $"{originalPitch:F2}";
+        var volumeDisplay = volumeChanged ? $"{originalVolume:F2} > {currentVolume:F2}" : $"{originalVolume:F2}";
+        var pitchDisplay = pitchChanged ? $"{originalPitch:F2} > {currentPitch:F2}" : $"{originalPitch:F2}";
 
         var messageDisplay = $"Clip {clipDisplay} Src {source.name} Vol {volumeDisplay} Pit {pitchDisplay} Grp {groupName}";
 
@@ -481,6 +495,9 @@ internal static class AudioEngine
 
         if (TrackedSources[source].IsOneShotSource)
             messageDisplay += " oneshot";
+
+        if (TrackedSources[source].IsCustomEvent)
+            messageDisplay += " event";
 
         Logging.LogInfo(messageDisplay, ModAudio.Plugin.LogAudioPlayed);
     }
@@ -551,7 +568,7 @@ internal static class AudioEngine
                 OptimizedMethods.CachedForeach(
                     TrackedSources,
                     source,
-                    static (in KeyValuePair<AudioSource, SourceState> trackedSource, in AudioSource stoppedSource) =>
+                    static (in KeyValuePair<AudioSource?, SourceState> trackedSource, in AudioSource stoppedSource) =>
                     {
                         if (trackedSource.Value.IsOneShotSource && trackedSource.Value.OneShotOrigin == stoppedSource && trackedSource.Key != null && trackedSource.Key.isPlaying)
                         {
@@ -641,7 +658,7 @@ internal static class AudioEngine
             }
         }
 
-        (AudioPack Pack, AudioPackConfig.Route Route) replacementRoute = (null, null);
+        (AudioPack Pack, AudioPackConfig.Route Route)? replacementRoute = null;
 
         if (replacements.Count > 0)
         {
@@ -649,15 +666,15 @@ internal static class AudioEngine
 
             // Apply overall effects
 
-            if (replacementRoute.Route.RelativeReplacementEffects)
+            if (replacementRoute.Value.Route.RelativeReplacementEffects)
             {
-                source.volume = trackedData.Volume * replacementRoute.Route.Volume;
-                source.pitch = trackedData.Pitch * replacementRoute.Route.Pitch;
+                source.volume = trackedData.Volume * replacementRoute.Value.Route.Volume;
+                source.pitch = trackedData.Pitch * replacementRoute.Value.Route.Pitch;
             }
             else
             {
-                source.volume = replacementRoute.Route.Volume;
-                source.pitch = replacementRoute.Route.Pitch;
+                source.volume = replacementRoute.Value.Route.Volume;
+                source.pitch = replacementRoute.Value.Route.Pitch;
             }
 
             TrackedSources[source] = TrackedSources[source] with
@@ -668,11 +685,11 @@ internal static class AudioEngine
 
             // Apply replacement if needed
 
-            if (replacementRoute.Route.ReplacementClips.Count > 0)
+            if (replacementRoute.Value.Route.ReplacementClips.Count > 0)
             {
-                var randomSelection = SelectRandomWeighted(replacementRoute.Route.ReplacementClips);
+                var randomSelection = SelectRandomWeighted(replacementRoute.Value.Route.ReplacementClips);
 
-                AudioClip destinationClip;
+                AudioClip? destinationClip;
 
                 if (randomSelection.Name == "___default___")
                 {
@@ -685,7 +702,7 @@ internal static class AudioEngine
                 }
                 else
                 {
-                    replacementRoute.Pack.TryGetReadyClip(randomSelection.Name, out destinationClip);
+                    replacementRoute.Value.Pack.TryGetReadyClip(randomSelection.Name, out destinationClip);
                 }
 
                 if (destinationClip != null)
@@ -724,7 +741,7 @@ internal static class AudioEngine
                 if (route.OverlaysIgnoreRestarts && !(TrackedSources[source].WasStoppedOrDisabled || !source.isPlaying))
                     continue;
 
-                if (route.OverlayClips.Count > 0 && IsValidTarget(source, route) && (!route.LinkOverlayAndReplacement || replacementRoute.Route == route))
+                if (route.OverlayClips.Count > 0 && IsValidTarget(source, route) && (!route.LinkOverlayAndReplacement || replacementRoute?.Route == route))
                     overlays.Add((pack, route));
             }
         }

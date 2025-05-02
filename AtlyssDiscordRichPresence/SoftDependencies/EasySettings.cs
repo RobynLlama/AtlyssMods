@@ -6,7 +6,7 @@ using BepInEx.Configuration;
 using Nessie.ATLYSS.EasySettings;
 using System.Runtime.CompilerServices;
 
-namespace Marioalexsan.ModAudio.SoftDependencies;
+namespace Marioalexsan.AtlyssDiscordRichPresence.SoftDependencies;
 
 public static class EasySettings
 {

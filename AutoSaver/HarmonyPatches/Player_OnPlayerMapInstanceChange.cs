@@ -7,9 +7,9 @@ static class Player_OnPlayerMapInstanceChange
 {
     static void Postfix(Player __instance, MapInstance _new)
     {
-        if (__instance == Player._mainPlayer && (AutoSaverMod.Instance.SaveOnMapChange || !AutoSaverMod.Instance.CharacterActive))
+        if (__instance == Player._mainPlayer && (AutoSaver.Plugin.SaveOnMapChange || !AutoSaver.Plugin.CharacterActive))
         {
-            AutoSaverMod.Instance.GameEntered();
+            AutoSaver.Plugin.GameEntered();
         }
     }
 }

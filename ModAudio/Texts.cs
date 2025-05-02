@@ -8,6 +8,9 @@ public static class Texts
     public const string LogAudioPlayedTitle = "Log audio played";
     public const string LogAudioPlayedDescription = "True to enable console logging for audio played, false to disable it.";
 
+    public const string AlwaysLogCustomEventsTitle = "Always log custom events played";
+    public const string AlwaysLogCustomEventsPlayedDescription = "True to enable console logging for custom events played even if they are unused, false to disable it.";
+
     public const string UseMaxDistanceForLoggingTitle = "Limit audio logged by distance";
     public const string UseMaxDistanceForLoggingDescription = "True to log audio played only if it's within a certain range of the player, false to log all sounds.";
 

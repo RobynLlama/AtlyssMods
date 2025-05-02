@@ -11,9 +11,11 @@ def keep_assembly_dependency(assembly):
   IGNORED_ASSEMBLIES = [
     "AsmResolver",
     "BepInEx.AssemblyPublicizer",
-    "Microsoft.Win32",
+    # "Microsoft.Win32",
     "Newtonsoft.Json",
-    #"System.",
+    # "System.",
+    "UnityEngine.",
+    "EasySettings"
   ]
 
   for part in IGNORED_ASSEMBLIES:
@@ -88,8 +90,20 @@ with open(csprojs[0], 'r') as f:
   else:
     print('Failed to find <Version> to use as mod version in .csproj, cannot pack mod as a result.')
     sys.exit(1)
+    
+  MATCH_RID = re.search("<RuntimeIdentifier>(.*)</RuntimeIdentifier>", CSPROJ_DATA)
+    
+  if MATCH_RID is not None:
+    MOD_RID = MATCH_RID.group(1)
+  else:
+    MOD_RID = None
 
+# os.chdir(os.path.join('bin', 'x64', 'Debug', FRAMEWORK))
 os.chdir(os.path.join('bin', 'Debug', FRAMEWORK))
+
+if MOD_RID is not None:
+  os.chdir(MOD_RID)
+
 ASSEMBLIES = [os.path.abspath(path) for path in glob.glob('*.dll') if keep_assembly_dependency(path)]
 PDBS = [os.path.abspath(path) for path in glob.glob('*.pdb')]
 
@@ -105,7 +119,11 @@ for assembly in ASSEMBLIES:
 for assembly in PDBS:
   print(' - ' + assembly)
 
+# os.chdir(os.path.join('..', '..', '..', '..', '..'))
 os.chdir(os.path.join('..', '..', '..', '..'))
+
+if MOD_RID is not None:
+  os.chdir('..')
 
 if not os.path.exists('_ThunderstoreBuild'):
   os.mkdir('_ThunderstoreBuild')

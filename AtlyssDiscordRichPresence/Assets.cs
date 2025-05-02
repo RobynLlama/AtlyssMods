@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Marioalexsan.AtlyssDiscordRichPresence;
+﻿namespace Marioalexsan.AtlyssDiscordRichPresence;
 public static class Assets
 {
     public const string ATLYSS_ICON = "atlyss_icon";

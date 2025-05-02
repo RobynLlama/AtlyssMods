@@ -1,7 +1,7 @@
 ﻿using BepInEx.Configuration;
 using BepInEx.Logging;
 
-namespace Marioalexsan.ModAudio;
+namespace Marioalexsan.AtlyssDiscordRichPresence;
 
 internal static class Logging
 {
@@ -12,7 +12,7 @@ internal static class Logging
     public static void LogInfo(object data, ConfigEntry<bool>? toggle = null) => Log(data, LogLevel.Info, toggle);
     public static void LogDebug(object data, ConfigEntry<bool>? toggle = null) => Log(data, LogLevel.Debug, toggle);
 
-    private static ManualLogSource InternalLogger => ModAudio.Plugin.Logger;
+    private static ManualLogSource InternalLogger => AtlyssDiscordRichPresence.Plugin.Logger;
 
     private static void Log(object data, LogLevel level = LogLevel.Info, ConfigEntry<bool>? toggle = null)
     {

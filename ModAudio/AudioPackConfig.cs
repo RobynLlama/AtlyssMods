@@ -207,7 +207,7 @@ public class AudioPackConfig
                     }
                 }
             }
-        });
+        }) ?? throw new InvalidOperationException("JSON deserialization returned a null object.");
 
         foreach (var warning in warnings)
         {

@@ -1,17 +1,14 @@
 using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection.Emit;
 
 namespace Marioalexsan.AllowAnyNames.HarmonyPatches;
 
-[HarmonyPatch(typeof(Player), nameof(Player.Handle_ServerConditions))]
-static class Player_Handle_NicknameParams
+[HarmonyPatch(typeof(Player), nameof(Player.Handle_ServerParameters))]
+static class Player_Handle_ServerParameters
 {
     static void Throw(string reason)
     {
-        throw new Exception($"Failed to transpile {nameof(ProfileDataSender.Assign_PlayerStats)}, please notify the mod developer about it! Reason: {reason}");
+        throw new Exception($"Failed to transpile {nameof(Player.Handle_ServerParameters)}, please notify the mod developer about it! Reason: {reason}");
     }
 
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> code)
@@ -20,7 +17,6 @@ static class Player_Handle_NicknameParams
 
         if (method == null)
             Throw("Failed to find method.");
-
 
         var matcher = new CodeMatcher(code);
 

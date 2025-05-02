@@ -1,8 +1,5 @@
 ﻿using BepInEx.Bootstrap;
 using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection.Emit;
 using UnityEngine;
 
@@ -15,7 +12,7 @@ static class ItemBankAutoSaver
     {
         if (SaveDone)
         {
-            AutoSaverMod.Instance.Logger.LogInfo("Triggering item bank save process...");
+            AutoSaver.Plugin.Logger.LogInfo("Triggering item bank save process...");
         }
 
         SaveLocationOverride = location;
@@ -24,12 +21,16 @@ static class ItemBankAutoSaver
         SaveProfileData(ProfileDataManager._current);
     }
 
-    private static string SaveLocationOverride; // Directory
-    private static string TempContents;
+#pragma warning disable IDE0044 // Add readonly modifier
+#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value null
+    private static string? SaveLocationOverride; // Directory
+    private static string? TempContents;
 
     private static int BanksDone = 0;
     private static int BanksMax = 0;
     internal static bool SaveDone { get; private set; } = true;
+#pragma warning restore IDE0044 // Add readonly modifier
+#pragma warning restore CS0649 // Field is never assigned to, and will always have its default value null
 
     [HarmonyReversePatch(HarmonyReversePatchType.Snapshot)]
     [HarmonyPriority(Priority.Last)]
@@ -58,7 +59,7 @@ static class ItemBankAutoSaver
                     new CodeInstruction(OpCodes.Stsfld, AccessTools.Field(typeof(ItemBankAutoSaver), nameof(TempContents))),
                     new CodeInstruction(OpCodes.Pop),
                     new CodeInstruction(OpCodes.Ldsfld, AccessTools.Field(typeof(ItemBankAutoSaver), nameof(SaveLocationOverride))),
-                    new CodeInstruction(OpCodes.Call, SymbolExtensions.GetMethodInfo(() => MarkSaveDone(null))),
+                    new CodeInstruction(OpCodes.Call, SymbolExtensions.GetMethodInfo(() => MarkSaveDone(null!))),
                     new CodeInstruction(OpCodes.Ldsfld, AccessTools.Field(typeof(ItemBankAutoSaver), nameof(TempContents)))
                     );
 
@@ -69,8 +70,8 @@ static class ItemBankAutoSaver
 
             if (patchLocations != expectedLocations)
             {
-                AutoSaverMod.Instance.Logger.LogWarning($"WARNING: Expected {expectedLocations} patch locations, got {patchLocations}.");
-                AutoSaverMod.Instance.Logger.LogWarning($"Either the vanilla code changed, or mods added extra stuff. This may or may not cause issues.");
+                AutoSaver.Plugin.Logger.LogWarning($"WARNING: Expected {expectedLocations} patch locations, got {patchLocations}.");
+                AutoSaver.Plugin.Logger.LogWarning($"Either the vanilla code changed, or mods added extra stuff. This may or may not cause issues.");
             }
 
             BanksMax = expectedLocations;
@@ -78,7 +79,7 @@ static class ItemBankAutoSaver
             return matcher.InstructionEnumeration();
         }
 
-        _ = Transpiler(null);
+        _ = Transpiler(null!);
         throw new NotImplementedException("Stub method");
     }
 
@@ -98,9 +99,9 @@ static class ItemBankAutoSaver
     {
         try
         {
-            AutoSaverMod.Instance.Logger.LogInfo("Attempting to save MoreBankTabs data...");
+            AutoSaver.Plugin.Logger.LogInfo("Attempting to save MoreBankTabs data...");
 
-            var moreBankTabsMod = Chainloader.PluginInfos[AutoSaverMod.MoreBankTabsIndentifier].Instance;
+            var moreBankTabsMod = Chainloader.PluginInfos[AutoSaver.MoreBankTabsIndentifier].Instance;
 
             var _itemStorageProfile_03 = AccessTools.Field(moreBankTabsMod.GetType(), "_itemStorageProfile_03").GetValue(moreBankTabsMod);
             var _itemStorageProfile_04 = AccessTools.Field(moreBankTabsMod.GetType(), "_itemStorageProfile_04").GetValue(moreBankTabsMod);
@@ -125,12 +126,12 @@ static class ItemBankAutoSaver
             File.WriteAllText(Path.Combine(location, "MoreBankTabs_itemBank_04"), contents04);
             File.WriteAllText(Path.Combine(location, "MoreBankTabs_itemBank_05"), contents05);
 
-            AutoSaverMod.Instance.Logger.LogInfo("MoreBankTabs slots saved.");
+            AutoSaver.Plugin.Logger.LogInfo("MoreBankTabs slots saved.");
         }
         catch (Exception e)
         {
-            AutoSaverMod.Instance.Logger.LogError("Failed to save MoreBankTabs info.");
-            AutoSaverMod.Instance.Logger.LogError($"Exception info: {e}");
+            AutoSaver.Plugin.Logger.LogError("Failed to save MoreBankTabs info.");
+            AutoSaver.Plugin.Logger.LogError($"Exception info: {e}");
         }
     }
 }

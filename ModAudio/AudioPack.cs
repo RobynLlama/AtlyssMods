@@ -24,7 +24,7 @@ public class AudioPack
             PackPath.StartsWith(ModAudio.Plugin.ModAudioPluginFolder);
     }
 
-    public bool TryGetReadyClip(string name, out AudioClip clip)
+    public bool TryGetReadyClip(string name, out AudioClip? clip)
     {
         if (ReadyClips.TryGetValue(name, out clip))
             return true;

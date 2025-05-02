@@ -7,6 +7,6 @@ static class Player_OnPlayerMapInstanceChange
 {
     static void Postfix(Player __instance, MapInstance _new)
     {
-        AtlyssDiscordRichPresenceMod.Instance.Player_OnPlayerMapInstanceChange(__instance, _new);
+        AtlyssDiscordRichPresence.Plugin.Player_OnPlayerMapInstanceChange(__instance, _new);
     }
 }

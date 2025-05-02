@@ -1,8 +1,4 @@
 ﻿using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Reflection.Emit;
 
 namespace Marioalexsan.AutoSaver.HarmonyReversePatches;
@@ -14,7 +10,7 @@ static class CharacterAutoSaver
     {
         if (SaveDone)
         {
-            AutoSaverMod.Instance.Logger.LogInfo("Triggering character save process...");
+            AutoSaver.Plugin.Logger.LogInfo("Triggering character save process...");
         }
 
         SaveLocationOverride = location;
@@ -27,7 +23,7 @@ static class CharacterAutoSaver
     {
         if (SaveDone)
         {
-            AutoSaverMod.Instance.Logger.LogInfo("Triggering character save process...");
+            AutoSaver.Plugin.Logger.LogInfo("Triggering character save process...");
         }
 
         SaveLocationOverride = location;
@@ -36,10 +32,14 @@ static class CharacterAutoSaver
         SaveProfileData(ProfileDataManager._current);
     }
 
-    private static string SaveLocationOverride;
-    private static string TempContents;
-    private static Player TargetPlayer;
+#pragma warning disable IDE0044 // Add readonly modifier
+#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value null
+    private static string? SaveLocationOverride;
+    private static string? TempContents;
+    private static Player? TargetPlayer;
     internal static bool SaveDone { get; private set; } = true;
+#pragma warning restore IDE0044 // Add readonly modifier
+#pragma warning restore CS0649 // Field is never assigned to, and will always have its default value null
 
     [HarmonyReversePatch(HarmonyReversePatchType.Snapshot)]
     [HarmonyPriority(Priority.Last)]
@@ -68,7 +68,7 @@ static class CharacterAutoSaver
                     new CodeInstruction(OpCodes.Stsfld, AccessTools.Field(typeof(CharacterAutoSaver), nameof(TempContents))),
                     new CodeInstruction(OpCodes.Pop),
                     new CodeInstruction(OpCodes.Ldsfld, AccessTools.Field(typeof(CharacterAutoSaver), nameof(SaveLocationOverride))),
-                    new CodeInstruction(OpCodes.Call, SymbolExtensions.GetMethodInfo(() => MarkSaveDone(null))),
+                    new CodeInstruction(OpCodes.Call, SymbolExtensions.GetMethodInfo(() => MarkSaveDone(null!))),
                     new CodeInstruction(OpCodes.Ldsfld, AccessTools.Field(typeof(CharacterAutoSaver), nameof(TempContents)))
                     );
 
@@ -79,8 +79,8 @@ static class CharacterAutoSaver
 
             if (patchLocations != expectedLocations)
             {
-                AutoSaverMod.Instance.Logger.LogWarning($"WARNING: Expected {expectedLocations} patch locations, got {patchLocations}.");
-                AutoSaverMod.Instance.Logger.LogWarning($"Either the vanilla code changed, or mods added extra stuff. This may or may not cause issues.");
+                AutoSaver.Plugin.Logger.LogWarning($"WARNING: Expected {expectedLocations} patch locations, got {patchLocations}.");
+                AutoSaver.Plugin.Logger.LogWarning($"Either the vanilla code changed, or mods added extra stuff. This may or may not cause issues.");
             }
 
             matcher.Start();
@@ -104,12 +104,12 @@ static class CharacterAutoSaver
                 patchLocations++;
             }
 
-            AutoSaverMod.Instance.Logger.LogInfo($"Patched {patchLocations} instances of Player._mainPlayer.");
+            AutoSaver.Plugin.Logger.LogInfo($"Patched {patchLocations} instances of Player._mainPlayer.");
 
             return matcher.InstructionEnumeration();
         }
 
-        _ = Transpiler(null);
+        _ = Transpiler(null!);
         throw new NotImplementedException("Stub method");
     }
 

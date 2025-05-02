@@ -7,6 +7,6 @@ static class PatternInstanceManager_Update
 {
     static void Postfix(PatternInstanceManager __instance)
     {
-        AtlyssDiscordRichPresenceMod.Instance.PatternInstanceManager_Update(__instance);
+        AtlyssDiscordRichPresence.Plugin.PatternInstanceManager_Update(__instance);
     }
 }

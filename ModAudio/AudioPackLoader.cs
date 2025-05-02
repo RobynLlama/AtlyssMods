@@ -5,6 +5,9 @@ namespace Marioalexsan.ModAudio;
 
 public static class AudioPackLoader
 {
+    private static readonly char[] BepInExCharsToSanitize = ['=', '\n', '\t', '\\', '"', '\'', '[', ']'];
+    private static readonly char[] BannedChars = [.. BepInExCharsToSanitize];
+
     public const float OneMB = 1024f * 1024f;
 
     public const string AudioPackConfigName = "modaudio.config.json";
@@ -21,19 +24,27 @@ public static class AudioPackLoader
             .Replace($"{Paths.ConfigPath}\\", "config://");
     }
 
-    private static bool IsNormalizedId(string id)
+    private static bool IsSanitizedId(string id)
     {
-        return !id.Contains("\\");
+        return SanitizeId(id) == id;
     }
 
-    private static string NormalizeId(string id)
+    private static string SanitizeId(string id)
     {
-        return id.Replace("\\", "/");
+        var sanitizedId = id;
+
+        for (int i = 0; i < BannedChars.Length; i++)
+        {
+            int codePoint = char.ConvertToUtf32($"{BannedChars[i]}", 0);
+            sanitizedId = sanitizedId.Replace($"{BannedChars[i]}", $"_{codePoint}");
+        }
+
+        return sanitizedId;
     }
 
     private static string ConvertPathToId(string path)
     {
-        return NormalizeId(ReplaceRootPath(path));
+        return SanitizeId(ReplaceRootPath(path).Replace("\\", "/"));
     }
 
     private static string ConvertPathToDisplayName(string path)
@@ -167,7 +178,7 @@ public static class AudioPackLoader
         }
     }
 
-    private static AudioPack LoadAudioPack(List<AudioPack> existingPacks, string path)
+    private static AudioPack? LoadAudioPack(List<AudioPack> existingPacks, string path)
     {
         Logging.LogInfo(Texts.LoadingPack(path), ModAudio.Plugin.LogPackLoading);
 
@@ -196,7 +207,7 @@ public static class AudioPackLoader
             // Assign an ID based on location
             pack.Config.Id = ConvertPathToId(pack.PackPath);
         }
-        else if (!IsNormalizedId(pack.Config.Id))
+        else if (!IsSanitizedId(pack.Config.Id))
         {
             Logging.LogWarning(Texts.InvalidPackId(pack.PackPath, pack.Config.Id));
             return null;
@@ -228,10 +239,10 @@ public static class AudioPackLoader
         return pack;
     }
 
-    private static AudioPack LoadLegacyAudioPack(List<AudioPack> existingPacks, string path)
+    private static AudioPack? LoadLegacyAudioPack(List<AudioPack> existingPacks, string path)
     {
         Logging.LogInfo(Texts.LoadingPack(path), ModAudio.Plugin.LogPackLoading);
-        var id = NormalizeId(ReplaceRootPath(path));
+        var id = SanitizeId(ReplaceRootPath(path));
 
         if (existingPacks.Any(x => x.Config.Id == id))
         {
@@ -254,8 +265,17 @@ public static class AudioPackLoader
         // Add explicit routes
         if (File.Exists(path))
         {
-            var routes = RouteConfig.ReadTextFormat(path);
-            pack.Config = AudioPackConfig.ConvertFromRoutes(routes);
+            try
+            {
+                var routes = RouteConfig.ReadTextFormat(path);
+                pack.Config = AudioPackConfig.ConvertFromRoutes(routes);
+            }
+            catch (Exception e)
+            {
+                Logging.LogWarning($"Failed to read legacy audio pack config for {ReplaceRootPath(path)}.");
+                Logging.LogWarning(e.ToString());
+                return null;
+            }
         }
 
         if (string.IsNullOrWhiteSpace(pack.Config.DisplayName))

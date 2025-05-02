@@ -13,7 +13,7 @@ static class PatternInstanceManager_HandleDungeonMusic
 {
     static MethodInfo TargetMethod() => typeof(PatternInstanceManager).GetMethods(AccessTools.all).First(x => x.Name.Contains("Handle_DungeonMusic"));
 
-    private static PatternInstanceManager Manager { get; set; }
+    private static PatternInstanceManager? Manager { get; set; }
 
     private static bool MusicSwitched { get; set; }
 
@@ -95,9 +95,9 @@ static class PatternInstanceManager_HandleDungeonMusic
         return matcher.InstructionEnumeration();
     }
 
-    private static AudioClip ManipulateClearMusic(AudioClip clip)
+    private static AudioClip? ManipulateClearMusic(AudioClip clip)
     {
-        return MusicSwitched ? Manager._muBossSrc.clip : clip;
+        return MusicSwitched ? Manager?._muBossSrc.clip : clip;
     }
 
     private static void SetMusicSwitched()

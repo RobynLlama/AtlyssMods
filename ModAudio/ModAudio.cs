@@ -11,7 +11,8 @@ namespace Marioalexsan.ModAudio;
 [BepInDependency(EasySettings.ModID, BepInDependency.DependencyFlags.SoftDependency)]
 public class ModAudio : BaseUnityPlugin
 {
-    public static ModAudio Plugin { get; private set; }
+    public static ModAudio Plugin => _plugin ?? throw new InvalidOperationException($"{nameof(ModAudio)} hasn't been initialized yet. Either wait until initialization, or check via ChainLoader instead.");
+    private static ModAudio? _plugin;
 
     public const float MinWeight = 0.001f;
     public const float MaxWeight = 1000f;
@@ -20,12 +21,30 @@ public class ModAudio : BaseUnityPlugin
 
     internal new ManualLogSource Logger { get; private set; }
 
-    private Harmony _harmony;
+    private readonly Harmony _harmony;
 
     private bool _reloadRequired = true;
 
     public string ModAudioConfigFolder => Path.Combine(Paths.ConfigPath, $"{ModInfo.PLUGIN_GUID}_UserAudioPack");
     public string ModAudioPluginFolder => Path.GetDirectoryName(Info.Location);
+
+    public ModAudio()
+    {
+        LogPackLoading = Config.Bind("Logging", nameof(LogPackLoading), true, Texts.LogAudioLoadingDescription);
+        LogAudioPlayed = Config.Bind("Logging", nameof(LogAudioPlayed), false, Texts.LogAudioPlayedDescription);
+        AlwaysLogCustomEventsPlayed = Config.Bind("Logging", nameof(AlwaysLogCustomEventsPlayed), false, Texts.AlwaysLogCustomEventsPlayedDescription);
+        UseMaxDistanceForLogging = Config.Bind("Logging", nameof(UseMaxDistanceForLogging), false, Texts.UseMaxDistanceForLoggingDescription);
+        MaxDistanceForLogging = Config.Bind("Logging", nameof(MaxDistanceForLogging), 32f, new ConfigDescription(Texts.MaxDistanceForLoggingDescription, new AcceptableValueRange<float>(32f, 2048)));
+
+        LogAmbience = Config.Bind("Logging", nameof(LogAmbience), true, Texts.LogAmbienceDescription);
+        LogGame = Config.Bind("Logging", nameof(LogGame), true, Texts.LogGameDescription);
+        LogGUI = Config.Bind("Logging", nameof(LogGUI), true, Texts.LogGUIDescription);
+        LogMusic = Config.Bind("Logging", nameof(LogMusic), true, Texts.LogMusicDescription);
+        LogVoice = Config.Bind("Logging", nameof(LogVoice), true, Texts.LogVoiceDescription);
+
+        Logger = base.Logger;
+        _harmony = new Harmony(ModInfo.PLUGIN_GUID);
+    }
 
     private void SetupBaseAudioPack()
     {
@@ -38,10 +57,8 @@ public class ModAudio : BaseUnityPlugin
 
     private void Awake()
     {
-        Plugin = this;
-        Logger = base.Logger;
-
-        _harmony = Harmony.CreateAndPatchAll(typeof(ModAudio).Assembly, ModInfo.PLUGIN_GUID);
+        _plugin = this;
+        _harmony.PatchAll(typeof(ModAudio).Assembly);
 
         SetupBaseAudioPack();
         InitializeConfiguration();
@@ -49,6 +66,7 @@ public class ModAudio : BaseUnityPlugin
 
     public ConfigEntry<bool> LogPackLoading { get; private set; }
     public ConfigEntry<bool> LogAudioPlayed { get; private set; }
+    public ConfigEntry<bool> AlwaysLogCustomEventsPlayed { get; private set; }
 
     public ConfigEntry<bool> UseMaxDistanceForLogging { get; private set; }
     public ConfigEntry<float> MaxDistanceForLogging { get; private set; }
@@ -60,23 +78,12 @@ public class ModAudio : BaseUnityPlugin
     public ConfigEntry<bool> LogVoice { get; private set; }
 
     public Dictionary<string, ConfigEntry<bool>> AudioPackEnabled { get; } = [];
-    public Dictionary<string, GameObject> AudioPackEnabledObjects { get; } = [];
+    public Dictionary<string, (GameObject Toggle, string DisplayName)> AudioPackEnabledObjects { get; } = [];
 
-    public GameObject AudioPackEnabledRoot { get; set; }
+    public GameObject? AudioPackEnabledRoot { get; set; }
 
     private void InitializeConfiguration()
     {
-        LogPackLoading = Config.Bind("Logging", nameof(LogPackLoading), true, Texts.LogAudioLoadingDescription);
-        LogAudioPlayed = Config.Bind("Logging", nameof(LogAudioPlayed), false, Texts.LogAudioPlayedDescription);
-        UseMaxDistanceForLogging = Config.Bind("Logging", nameof(UseMaxDistanceForLogging), false, Texts.UseMaxDistanceForLoggingDescription);
-        MaxDistanceForLogging = Config.Bind("Logging", nameof(MaxDistanceForLogging), 32f, new ConfigDescription(Texts.MaxDistanceForLoggingDescription, new AcceptableValueRange<float>(32f, 2048)));
-
-        LogAmbience = Config.Bind("Logging", nameof(LogAmbience), true, Texts.LogAmbienceDescription);
-        LogGame = Config.Bind("Logging", nameof(LogGame), true, Texts.LogGameDescription);
-        LogGUI = Config.Bind("Logging", nameof(LogGUI), true, Texts.LogGUIDescription);
-        LogMusic = Config.Bind("Logging", nameof(LogMusic), true, Texts.LogMusicDescription);
-        LogVoice = Config.Bind("Logging", nameof(LogVoice), true, Texts.LogVoiceDescription);
-
         if (EasySettings.IsAvailable)
         {
             EasySettings.OnApplySettings.AddListener(() =>
@@ -115,6 +122,7 @@ public class ModAudio : BaseUnityPlugin
                 EasySettings.AddHeader(ModInfo.PLUGIN_NAME);
                 EasySettings.AddToggle(Texts.LogAudioLoadingTitle, LogPackLoading);
                 EasySettings.AddToggle(Texts.LogAudioPlayedTitle, LogAudioPlayed);
+                EasySettings.AddToggle(Texts.AlwaysLogCustomEventsTitle, AlwaysLogCustomEventsPlayed);
                 EasySettings.AddToggle(Texts.UseMaxDistanceForLoggingTitle, UseMaxDistanceForLogging);
                 EasySettings.AddAdvancedSlider(Texts.MaxDistanceForLoggingTitle, MaxDistanceForLogging, true);
 
@@ -129,18 +137,15 @@ public class ModAudio : BaseUnityPlugin
 
     internal void InitializePackConfiguration()
     {
-        if (!AudioPackEnabledRoot)
+        if (EasySettings.IsAvailable && !AudioPackEnabledRoot)
         {
-            if (EasySettings.IsAvailable)
+            EasySettings.AddHeader($"{ModInfo.PLUGIN_NAME} audio packs");
+            EasySettings.AddButton(Texts.OpenCustomAudioPackTitle, () =>
             {
-                EasySettings.AddHeader($"{ModInfo.PLUGIN_NAME} audio packs");
-                EasySettings.AddButton(Texts.OpenCustomAudioPackTitle, () =>
-                {
-                    SetupBaseAudioPack();
-                    Application.OpenURL(new Uri($"{ModAudioConfigFolder}").AbsoluteUri);
-                });
-                AudioPackEnabledRoot = EasySettings.AddButton(Texts.ReloadTitle, () => _reloadRequired = true);
-            }
+                SetupBaseAudioPack();
+                Application.OpenURL(new Uri($"{ModAudioConfigFolder}").AbsoluteUri);
+            });
+            AudioPackEnabledRoot = EasySettings.AddButton(Texts.ReloadTitle, () => _reloadRequired = true);
         }
 
         foreach (var pack in AudioEngine.AudioPacks)
@@ -154,7 +159,7 @@ public class ModAudio : BaseUnityPlugin
                 if (EasySettings.IsAvailable)
                 {
                     if (!AudioPackEnabledObjects.ContainsKey(pack.Config.Id))
-                        AudioPackEnabledObjects[pack.Config.Id] = EasySettings.AddToggle(pack.Config.DisplayName, enabled);
+                        AudioPackEnabledObjects[pack.Config.Id] = (EasySettings.AddToggle(pack.Config.DisplayName, enabled), pack.Config.DisplayName);
                 }
 
                 pack.Enabled = enabled.Value;
@@ -165,20 +170,20 @@ public class ModAudio : BaseUnityPlugin
             }
         }
 
-        if (EasySettings.IsAvailable)
+        if (EasySettings.IsAvailable && AudioPackEnabledRoot != null)
         {
             int siblingIndex = AudioPackEnabledRoot.transform.GetSiblingIndex() + 1;
 
-            foreach (var config in AudioPackEnabledObjects.OrderBy(x => x.Key))
+            foreach (var config in AudioPackEnabledObjects.OrderBy(x => x.Value.DisplayName))
             {
-                // Reorder so that it's in the audio pack list
-                config.Value.transform.SetSiblingIndex(siblingIndex++);
+                // Reorder so that it's in the audio pack list, sorted by display name
+                config.Value.Toggle.transform.SetSiblingIndex(siblingIndex++);
             }
 
             foreach (var config in AudioPackEnabledObjects)
             {
                 // Show or hide if pack is present
-                config.Value.SetActive(AudioEngine.AudioPacks.Any(x => x.Config.Id == config.Key));
+                config.Value.Toggle.SetActive(AudioEngine.AudioPacks.Any(x => x.Config.Id == config.Key));
             }
         }
     }
