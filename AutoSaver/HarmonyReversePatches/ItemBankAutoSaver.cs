@@ -70,7 +70,7 @@ static class ItemBankAutoSaver
 
             if (patchLocations != expectedLocations)
             {
-                AutoSaver.Plugin.Logger.LogWarning($"WARNING: Expected {expectedLocations} patch locations, got {patchLocations}.");
+                AutoSaver.Plugin.Logger.LogWarning($"WARNING: ItemBankAutoSaver expected {expectedLocations} patch locations, got {patchLocations}.");
                 AutoSaver.Plugin.Logger.LogWarning($"Either the vanilla code changed, or mods added extra stuff. This may or may not cause issues.");
             }
 

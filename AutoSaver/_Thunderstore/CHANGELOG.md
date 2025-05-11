@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2024-Dec-17
+
+### Added
+
+- Added support for EasySettings version 1.1.6
+- Added EnableAutosaving config option that enables or disables the periodic autosave component (default: true)
+- Added AppendSlotToSaveName config option that enabled or disables appending the slot index to the backup names (default: true)
+  - It's recommended to keep this set to true; setting this to false can be useful when moving saves between save slots, but will cause characters with duplicate names to overwrite each other
+
+### Changed
+
+- Migrated the backup save folder from `ATLYSS/ATLYSS_Data/_profileCollections/Marioalexsan_AutoSaver` to `ATLYSS/Marioalexsan_AutoSaver`
+  - Saves from AutoSaver version 1.1.1 and below will be migrated automatically on first launch
+- Updated compatibility for public test branch of ATLYSS (currently v2.0.5d)
+  - Note that this is experimental and subject to change until a stable version is released
+
 ## [1.1.1] - 2024-Dec-17
 
 ### Changed

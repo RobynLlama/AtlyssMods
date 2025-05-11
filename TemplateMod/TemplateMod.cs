@@ -1,13 +1,6 @@
-﻿using System.Security;
-using System.Security.Permissions;
-using BepInEx;
+﻿using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
-
-#pragma warning disable CS0618
-
-[module: UnverifiableCode]
-[assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification = true)]
 
 namespace Marioalexsan.TemplateMod;
 

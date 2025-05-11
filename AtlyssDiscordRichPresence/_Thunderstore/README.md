@@ -47,6 +47,22 @@ The available variables are as follows:
 
 You can also further configure how player races (PLAYERRACE) and player classes (PLAYERCLASS) are displayed by configuring variables such as `RacePoon`
 
+# Linux Compatibility
+
+To play with this mod on Linux, you'll need to download and use [rpc-bridge](https://github.com/EnderIce2/rpc-bridge) to allow for Rich Presence support.
+
+In ATLYSS's Steam settings, General tab, Launch options, you'll have to enter the following text, where `/path/to/bridge.sh` is the path to the downloaded script:
+
+```
+/path/to/bridge.sh %command%
+```
+
+You will also have to make `bridge.sh` executable by opening a terminal in the containing folder, and running the following command: 
+
+```
+chmod +x bridge.sh
+```
+
 # Mod Compatibility
 
 AtlyssDiscordRichPresence targets the following game versions and mods:

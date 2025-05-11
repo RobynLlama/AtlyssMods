@@ -5,8 +5,9 @@ using BepInEx.Bootstrap;
 using BepInEx.Configuration;
 using Nessie.ATLYSS.EasySettings;
 using System.Runtime.CompilerServices;
+using Nessie.ATLYSS.EasySettings.UIElements;
 
-namespace Marioalexsan.ModAudio.SoftDependencies;
+namespace Marioalexsan.AutoSaver.SoftDependencies;
 
 public static class EasySettings
 {
@@ -15,7 +16,7 @@ public static class EasySettings
     // Bookkeeping
 
     public const string ModID = "EasySettings";
-    public static readonly Version ExpectedVersion = new Version("1.1.4");
+    public static readonly Version ExpectedVersion = new Version("1.1.6");
 
     public static bool IsAvailable
     {
@@ -91,6 +92,10 @@ public static class EasySettings
     [MethodImpl(SoftDepend)]
     public static GameObject AddAdvancedSlider(string label, ConfigEntry<float> config, bool wholeNumbers = false)
         => Settings.ModTab.AddAdvancedSlider(label, config, wholeNumbers).Root.gameObject;
+
+    [MethodImpl(SoftDepend)]
+    public static GameObject AddAdvancedSlider(string label, ConfigEntry<int> config)
+        => Settings.ModTab.AddAdvancedSlider(label, config).Root.gameObject;
 
     [MethodImpl(SoftDepend)]
     public static GameObject AddDropdown<T>(string label, ConfigEntry<T> config) where T : Enum

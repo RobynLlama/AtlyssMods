@@ -15,7 +15,7 @@ public static class EasySettings
     // Bookkeeping
 
     public const string ModID = "EasySettings";
-    public static readonly Version ExpectedVersion = new Version("1.1.3");
+    public static readonly Version ExpectedVersion = new Version("1.1.4");
 
     public static bool IsAvailable
     {

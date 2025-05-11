@@ -8,15 +8,22 @@ import zipfile
 import json
 
 def keep_assembly_dependency(assembly):
+  WHITELISTED_ASSEMBLIES = [
+    "Microsoft.Win32.Registry"
+  ]
+
   IGNORED_ASSEMBLIES = [
     "AsmResolver",
     "BepInEx.AssemblyPublicizer",
-    # "Microsoft.Win32",
     "Newtonsoft.Json",
-    # "System.",
     "UnityEngine.",
-    "EasySettings"
+    "EasySettings",
+    "System."
   ]
+
+  for part in WHITELISTED_ASSEMBLIES:
+    if part in assembly:
+      return True
 
   for part in IGNORED_ASSEMBLIES:
     if part in assembly:

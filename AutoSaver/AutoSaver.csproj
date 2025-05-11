@@ -8,13 +8,13 @@
         <Product>AutoSaver</Product>
         <AssemblyName>Marioalexsan.AutoSaver</AssemblyName>
         <RootNamespace>Marioalexsan.AutoSaver</RootNamespace>
-        <Version>1.1.1</Version>
+        <Version>1.2.0</Version>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>latest</LangVersion>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
         <ImplicitUsings>enable</ImplicitUsings>
-        <Platforms>AnyCPU;x64</Platforms>
+        <Platforms>AnyCPU</Platforms>
     </PropertyGroup>
 
     <ItemGroup>
@@ -25,6 +25,7 @@
             <IncludeAssets>all</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
+        <PackageReference Include="Nessie-EasySettings" Version="1.1.3" Private="False" />
         <Reference Include="$(ATLYSS_MANAGED)/Assembly-CSharp.dll" Publicize="true" Private="False" />
         <Reference Include="$(ATLYSS_MANAGED)/Newtonsoft.Json.dll" Private="False" />
         <Reference Include="$(ATLYSS_MANAGED)/Mirror.dll" Private="False" />

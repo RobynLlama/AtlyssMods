@@ -4,11 +4,11 @@
         <DebugSymbols>true</DebugSymbols>
         <DebugType>embedded</DebugType>
         <TargetFramework>netstandard2.1</TargetFramework>
-        <ThunderstoreName>ModAudio</ThunderstoreName>
-        <Product>ModAudio</Product>
-        <AssemblyName>Marioalexsan.ModAudio</AssemblyName>
-        <RootNamespace>Marioalexsan.ModAudio</RootNamespace>
-        <Version>2.2.1</Version>
+        <ThunderstoreName>ExtraSaveSlots</ThunderstoreName>
+        <Product>ExtraSaveSlots</Product>
+        <AssemblyName>Marioalexsan.ExtraSaveSlots</AssemblyName>
+        <RootNamespace>Marioalexsan.ExtraSaveSlots</RootNamespace>
+        <Version>1.0.0</Version>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>latest</LangVersion>
@@ -16,27 +16,21 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Platforms>AnyCPU</Platforms>
     </PropertyGroup>
-    
+
     <ItemGroup>
         <PackageReference Include="BepInEx.Analyzers" PrivateAssets="all" Version="1.*" />
         <PackageReference Include="BepInEx.Core" Version="5.4.*" />
         <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.2" PrivateAssets="all" />
-        <PackageReference Include="NAudio.Core" Version="2.2.1" />
-        <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
-        <PackageReference Include="NVorbis" Version="0.10.5" />
         <PackageReference Include="UnityEngine.Modules" Version="2021.3.16">
             <IncludeAssets>all</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        <PackageReference Include="Nessie-EasySettings" Version="1.1.3" Private="False" />
         <Reference Include="$(ATLYSS_MANAGED)/Assembly-CSharp.dll" Publicize="true" Private="False" />
+        <Reference Include="$(ATLYSS_MANAGED)/UnityEngine.UI.dll" Private="False" />
         <Reference Include="$(ATLYSS_MANAGED)/Newtonsoft.Json.dll" Private="False" />
         <Reference Include="$(ATLYSS_MANAGED)/Mirror.dll" Private="False" />
     </ItemGroup>
 
-    <ItemGroup>
-        <Folder Include="Utils/" />
-    </ItemGroup>
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
         <Exec Command="python ../_Utils/pack_game.py $(MSBuildProjectName)/" ContinueOnError="true" />
     </Target>
