@@ -18,6 +18,6 @@ If for some reason you need more than 128 save slots, you can increase it up to 
 
 # Mod Compatibility
 
-This mod version targets ATLYSS v1.6.2b.
+This mod version targets ATLYSS v1.6.2b. It also has experimental support for the public test branch (version 2.0.5d).
 
 Compatibility with other game versions is not guaranteed, especially for updates with major changes.

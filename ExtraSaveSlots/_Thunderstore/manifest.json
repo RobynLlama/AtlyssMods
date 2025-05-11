@@ -1,7 +1,7 @@
 {
   "name": "ExtraSaveSlots",
   "description": "Have as many character saves as you want.",
-  "version_number": "1.0.0",
+  "version_number": "1.0.1",
   "dependencies": [
     "BepInEx-BepInExPack-5.4.2100"
   ],

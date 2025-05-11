@@ -102,15 +102,29 @@ public class ExtraSaveSlots : BaseUnityPlugin
     {
         var eye = container.Find("_charSelect_illuminatiEye");
 
-        var settingsTab = GameObject.Find("_dolly_networkSettingsTab");
+        var settingsTab =
+            GameObject.Find("_dolly_networkSettingsTab") 
+            ?? GameObject.Find("_dolly_audioSettingsTab")
+            ?? GameObject.Find("_dolly_inputSettingsTab")
+            ?? GameObject.Find("_dolly_videoSettingsTab");
 
-        if (!settingsTab || !settingsTab.transform.Find("Image/Scroll View/Viewport/Content"))
+        if (!settingsTab)
         {
             Logging.LogWarning($"Couldn't instantiate scroll view! Wasn't able to find components to use!");
             return container;
         }
 
-        var rootObj = settingsTab.transform.Find("Image");
+        var rootObj = 
+            settingsTab.transform.Find("_backdrop_videoSettings")
+            ?? settingsTab.transform.Find("Image")
+            ?? settingsTab.transform.Find("_backdrop")
+            ?? settingsTab.transform.Find("_backdrop_videoSettings");
+
+        if (!rootObj || !rootObj.Find("Scroll View/Viewport/Content"))
+        {
+            Logging.LogWarning($"Couldn't instantiate scroll view! Wasn't able to find components to use!");
+            return container;
+        }
 
         var obj = Instantiate(rootObj);
         obj.SetParent(null);
