@@ -18,11 +18,6 @@ If for some reason you need more than 128 save slots, you can increase it up to 
 
 # Mod Compatibility
 
-This mod version targets ATLYSS v1.6.2b. It also has experimental support for the public test branch (version 2.0.5d).
+This mod version targets ATLYSS v1.6.2b.
 
-The mod has compatibility with the following mods:
-
-- "More Bank Tabs" v0.1.1 - if this mod is detected, AutoSaver will try to backup the three extra slots created by it.
-  - Extra slots will follow the format `MoreBankTabs_itemBank_{X}`, where X is the extra slot.
-
- Compatibility with other game versions is not guaranteed, especially for updates with major changes.
+Compatibility with other game versions is not guaranteed, especially for updates with major changes.
