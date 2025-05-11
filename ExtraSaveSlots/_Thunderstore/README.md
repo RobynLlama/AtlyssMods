@@ -8,6 +8,8 @@ The save files follow the same format as the vanilla game's save files, being st
 
 The mod will also load save slots 6 through 127 if dropped directly in the `profileCollections` folder.
 
+![](https://github.com/Marioalexsan/AtlyssMods/blob/main/_Assets/ExtraSaveSlotsUI.png?raw=true)
+
 # Configuration
 
 If for some reason you need more than 128 save slots, you can increase it up to 65536 with the `MaxSupportedSaves` configuration option in `BepInEx/config/Marioalexsan.ExtraSaveSlots.cfg`.
