@@ -137,11 +137,17 @@ internal static class AudioEngine
         return true;
     }
 
+    /*
+    Note: Since these are only called from sync code I think
+    it should be okay how they're setup but I dunno.
+        Robyn
+    */
+
     public static void HardReload() => Reload(hardReload: true);
 
     public static void SoftReload() => Reload(hardReload: false);
 
-    private static void Reload(bool hardReload)
+    private static async void Reload(bool hardReload)
     {
         Watch.Restart();
 
@@ -212,8 +218,11 @@ internal static class AudioEngine
             }
 
             Logging.LogInfo("Preloading audio data...");
+            List<Task> preloadTasks = [];
+
             foreach (var pack in AudioPacks)
             {
+
                 if (pack.Enabled && pack.PendingClipsToLoad.Count > 0)
                 {
                     // If a pack is enabled, we should preload all of the in-memory clips
@@ -223,12 +232,14 @@ internal static class AudioEngine
 
                     foreach (var clip in clipsToPreload)
                     {
-                        _ = pack.TryGetReadyClip(clip, out _);
+                        preloadTasks.Add(Task.Run(() => { return pack.TryGetReadyClip(clip, out _); }));
                     }
 
                     Logging.LogInfo($"{pack.Config.Id} - {clipsToPreload.Length} clips preloaded.");
                 }
             }
+
+            await Task.WhenAll(preloadTasks);
             Logging.LogInfo("Audio data preloaded.");
 
             // Restart audio
@@ -757,7 +768,7 @@ internal static class AudioEngine
                 if (randomSelection.Name == "___nothing___")
                     continue;
 
-                if (Pack.TryGetReadyClip(randomSelection.Name, out var selectedClip))
+                if (Pack.TryGetReadyClip(randomSelection.Name, out var selectedClip).Result)
                 {
                     var oneShotSource = CreateOneShotFromSource(source);
                     oneShotSource.clip = selectedClip;

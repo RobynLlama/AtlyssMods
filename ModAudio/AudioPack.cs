@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections.Concurrent;
+using UnityEngine;
 
 namespace Marioalexsan.ModAudio;
 
@@ -12,11 +13,11 @@ public class AudioPack
 
     public List<AudioClipLoader.IAudioStream> OpenStreams { get; } = []; // Only touch this if you plan on cleaning up the pack
 
-    public Dictionary<string, AudioClip> ReadyClips { get; } = [];
+    public ConcurrentDictionary<string, AudioClip> ReadyClips { get; } = [];
 
     // These clips are loaded / streamed when needed
-    public Dictionary<string, Func<AudioClip>> PendingClipsToLoad { get; } = [];
-    public Dictionary<string, Func<AudioClip>> PendingClipsToStream { get; } = [];
+    public ConcurrentDictionary<string, Func<AudioClip>> PendingClipsToLoad { get; } = [];
+    public ConcurrentDictionary<string, Func<AudioClip>> PendingClipsToStream { get; } = [];
 
     public bool IsUserPack()
     {
@@ -24,26 +25,37 @@ public class AudioPack
             PackPath.StartsWith(ModAudio.Plugin.ModAudioPluginFolder);
     }
 
-    public bool TryGetReadyClip(string name, out AudioClip? clip)
+    public Task<bool> TryGetReadyClip(string name, out AudioClip? clip)
     {
         if (ReadyClips.TryGetValue(name, out clip))
-            return true;
+            return Task.FromResult(true);
+
+        /*
+            Note for the changes below: I suspect this is doing
+            too many checks since ConcurrentDictionary.Remove also
+            returns the value it removed but I don't know enough
+            to modify these calls to cut down on cycles. Probably
+            not a huge deal, anyway.
+                Robyn
+        */
 
         if (PendingClipsToStream.TryGetValue(name, out var streamer))
         {
-            PendingClipsToStream.Remove(name);
+            //Discard the removed value
+            PendingClipsToStream.Remove(name, out var _);
             clip = ReadyClips[name] = streamer();
-            return true;
+            return Task.FromResult(true);
         }
 
         if (PendingClipsToLoad.TryGetValue(name, out var loader))
         {
-            PendingClipsToLoad.Remove(name);
+            //Discard the removed value
+            PendingClipsToLoad.Remove(name, out var _);
             clip = ReadyClips[name] = loader();
-            return true;
+            return Task.FromResult(true);
         }
 
         clip = null;
-        return false;
+        return Task.FromResult(false);
     }
 }
